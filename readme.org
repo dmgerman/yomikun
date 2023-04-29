@@ -6,7 +6,7 @@ This is work in progress.
   - uses mecab
 - [ ] typeset the text according to learning status (still to be completed)
      - similar to migaku
-     - data saved in a SQL database
+     - data saved in a SQLite database
 - [ ] display dictionary (similar to yomichan)
   
 - [ ] put all together
