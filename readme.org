@@ -1,0 +1,14 @@
+* mode for reading japanese
+
+This is work in progress.
+
+- [X] tokenize and colour text according to type of token
+  - uses mecab
+- [ ] typeset the text according to learning status (still to be completed)
+     - similar to migaku
+     - data saved in a SQL database
+- [ ] display dictionary (similar to yomichan)
+  
+- [ ] put all together
+
+
