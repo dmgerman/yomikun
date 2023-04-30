@@ -127,10 +127,12 @@
                  (buffer-substring-no-properties (point-min) (point-max)))
                )
        ;; remove end marker
+       (message "done processing raw mecab")
        (outputMecab (substring output 0 (string-match my-process-end-st output)))
        ;; separate tokens
        (jpTokens (my-process-filter outputMecab))
-       
+       (message "done processing processing tokens")
+
        )
     (message "finished mecab processng %d tokens" (length jpTokens))
     ;; process the tokens
@@ -396,6 +398,7 @@
 
 
 (defun my-set-text-prop-token (token)
+;  (message "setting prope [%s]" token)
   (let*
       (
        (beg (plist-get token 'begin))
@@ -443,7 +446,7 @@
   (with-silent-modifications
     (dolist (token jpTokens)
       
-      (if (my-has-japanese-characters-p (plist-get token 'surface))
+      (if (my-has-japanese-characters-p (plist-get token 'seen))
           (if (my-process-wtype-p token)
               (my-set-text-prop-token token)            
             )
@@ -514,19 +517,20 @@ Properties is a property-list with information about the
 "
 (let* (
        (textpair (and line (split-string line "\t")))
-       (surface  (nth 0 textpair))
+       (seen     (nth 0 textpair))
        (info     (nth 1 textpair))
        (infolist (and info (split-string info ",")))
        (wtype   (and infolist (nth 0 infolist)))
        (root    (and infolist (nth 7 infolist)))
        (pronun  (and infolist (nth 9 infolist)))
+       (surface (and infolist (nth 10 infolist)))
        )
   (progn
                                         
-    (if (string-equal "EOS" surface)  ; EOS is a line end
-        (setq surface "\n"))
+    (if (string-equal "EOS" seen)  ; EOS is a line end
+        (setq seen "\n"))
 ;    (message "Line [%s] surface [%s] [%d]" line surface (string-width surface))
-    (list 'surface surface 'wtype wtype 'root root 'pronun pronun)
+    (list 'seen seen 'surface surface 'wtype wtype 'root root 'pronun pronun)
     ))
 )
 
@@ -546,8 +550,8 @@ Properties is a property-list with information about the
     running-lengths))
 
 (defun my-sync-list-to-st (lst st)
-;  (message "entering [%s]" (my-until-eoln st))
-;  (message "%s " (car lst))
+  (message "entering [%s]" (my-until-eoln st))
+  (message "%s " (car lst))
   (let (
         (output (list))
         (counter 0)
@@ -558,15 +562,15 @@ Properties is a property-list with information about the
                   (not (null lst)))
         (let* (
                (nextToken (nth 0 lst))
-               (next (plist-get nextToken 'surface ))
-               (nextLen  (length next))
-               (prefix (substring st 0 nextLen))
+               (next      (plist-get nextToken 'seen))
+               (nextLen   (length next))
+               (prefix    (substring st 0 nextLen))
                )
           (if (< counter my-max-tokens-to-process)
             ;; just in case we get into an infinite loop, or the input is humongous
             
             (setq counter (+ counter 1))
- ;           (message "current next [%s]" (my-until-eoln st))
+;            (message "current next [%s]" (my-until-eoln st))
 ;            (message "    next token [%s]" nextToken)
 ;            (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
             
@@ -585,13 +589,13 @@ Properties is a property-list with information about the
               ; does not match
               (let* (
                      (skip (cl-search next st)) ;; text that is skipped
-                     (newSurface (substring st 0 skip))
+                     (newSeen (substring st 0 skip))
                      (endpos (+ position skip -1))
                      ;; the next line is not really necessary
                      ;; unless we require that the list of tokens
                      ;; represent ALL the text (i.e. the text
                      ;; can be regenerated from the tokens)
-                     (newToken (list 'surface newSurface 'begin position 'end endpos 'wtype "other"))
+                     (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
                     )
                 (progn
                   (setq st (substring st skip))
@@ -605,7 +609,7 @@ Properties is a property-list with information about the
         )
       ; left over string... 
       (if (> (length st) 0)
-          (add-to-list 'output (list newSurface (list 'wtype "other"))  t)        
+          (add-to-list 'output (list 'seen newSurface 'surface newSurface 'wtype "other")  t)        
         )
       output
       )))
