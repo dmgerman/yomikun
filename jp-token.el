@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (defvar my-command "echo" "Shell command to run on buffer contents")
 (defvar my-process-name "jp-process")
 
@@ -7,6 +9,8 @@
 (setq my-command  "/Users/dmg/bin/osx/m-mecab.sh")
 
 (defvar my-max-tokens-to-process 10000)
+
+(setq my-max-tokens-to-process 100000)
 
 (defvar my-process-buffer "*jp-process-buffer*" "Name of buffer for shell command process")
 
@@ -555,63 +559,79 @@ Properties is a property-list with information about the
   (let (
         (output (list))
         (counter 0)
+        (offset 0)
+        (lenSt (length st))
         (position 1)
       )
     (progn
-      (while (and (> (length st) 0)
+      (while (and (> lenSt offset)
                   (not (null lst)))
         (let* (
                (nextToken (nth 0 lst))
                (next      (plist-get nextToken 'seen))
                (nextLen   (length next))
-               (prefix    (substring st 0 nextLen))
+               (prefix    (substring st offset (+ nextLen offset)))
                )
+;          (message "entering iteration %d offset %d lenSt %d len tokens [%d] next [%s]" counter offset lenSt (length lst) (nth 0 lst))
           (if (< counter my-max-tokens-to-process)
             ;; just in case we get into an infinite loop, or the input is humongous
             
-            (setq counter (+ counter 1))
-;            (message "current next [%s]" (my-until-eoln st))
-;            (message "    next token [%s]" nextToken)
-;            (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
-            
-            (if (string-equal next prefix ) ; test matches
-                (let ((endpos (+ position nextLen -1))
-                      ) 
-                  (progn
-                    (setq st (substring st nextLen))
-                    (plist-put nextToken 'begin position)
-                    (plist-put nextToken 'end   endpos)
-                    (setq position (+ endpos 1))
-                    (add-to-list 'output nextToken t)
-;                    (message "    + it matches!! remaining chars %d [%s]" (length st) nextToken)
-                    (setq lst (cdr lst))
-                ))
-              ; does not match
-              (let* (
-                     (skip (cl-search next st)) ;; text that is skipped
-                     (newSeen (substring st 0 skip))
-                     (endpos (+ position skip -1))
-                     ;; the next line is not really necessary
-                     ;; unless we require that the list of tokens
-                     ;; represent ALL the text (i.e. the text
-                     ;; can be regenerated from the tokens)
-                     (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
-                    )
-                (progn
-                  (setq st (substring st skip))
-                  (add-to-list 'output newToken  t)
-;                  (message "   > does not match. new token [%s]" newToken)
-                  (setq position (+ endpos 1))
-                  )))
-            
-;            (message ">>>> to start another iteration [%s] [%s]" st (nth 0 lst))
+              (progn
+                (setq counter (+ counter 1))
+                ;;(message "current next [%s]" (my-until-eoln st))
+                ;;(message "    next token [%s]" nextToken)
+                ;;(message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
+                (if (string-equal next prefix ) ; test matches
+                    (let ((endpos (+ position nextLen -1))
+                          ) 
+                      (progn
+                        (setq offset (+ offset nextLen))
+                                        ;                    (setq st (substring st nextLen))
+                        (plist-put nextToken 'begin position)
+                        (plist-put nextToken 'end   endpos)
+                        (setq position (+ endpos 1))
+                        (push nextToken output)
+                        ;;(add-to-list 'output nextToken t)
+                        ;;(message "    + it matches!! offset %d [%s]" offset nextToken)
+                        (setq lst (cdr lst))
+                        ))
+                                        ; does not match
+                  (let* (
+                         ;; search from offset
+                         (skip (cl-search next (substring st offset))) ;; text that is skipped
+                         (newSeen (substring st offset (+ skip offset)))
+                         (endpos (+ position skip -1))
+                         ;; the next line is not really necessary
+                         ;; unless we require that the list of tokens
+                         ;; represent ALL the text (i.e. the text
+                         ;; can be regenerated from the tokens)
+                         (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
+                         )
+                    (progn
+                      (setq offset (+ offset skip))
+                      ;;(setq st (substring st skip))
+                      (push newToken output)
+                      ;;(add-to-list 'output newToken  t)
+                      ;;(message "   > does not match. new token [%s] skip [%d]q" newToken skip)
+                      (setq position (+ endpos 1))
+                      )))
+ 
+                )
+
+           
+ ;           (message ">>>> to start another iteration [%d] [%s]" offset (nth 0 lst))
           ))
         )
       ; left over string... 
-      (if (> (length st) 0)
-          (add-to-list 'output (list 'seen newSurface 'surface newSurface 'wtype "other")  t)        
+      (if (> lenSt offset)
+          (progn
+            (message "there was a leftover text [%s]" (substring output offset))
+            (push (list 'seen newSurface 'surface newSurface 'wtype "other")
+                  (substring output offset))
+                                        ;          (add-to-list 'output (list 'seen newSurface 'surface newSurface 'wtype "other")  t)
+            )
         )
-      output
+      (nreverse output)
       )))
 
 (defvar my-minor-map (make-sparse-keymap)
