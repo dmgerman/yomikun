@@ -1,8 +1,16 @@
 * mode for reading japanese
 
+- tokenize Japanese text
+- keep track of reading status of works (similar to Anki's morphan and Migaku)
+- overlay information about the definition and pronunciation of current word
+   (similar to Yomichan)
+
+#+ATTR_HTML: :width 100
+#+ATTR_ORG: :width 800px
 [[./screenshot.png]]
 
-This is work in progress.
+
+* This is work in progress.
 
 - [X] tokenize and colour text according to type of token
   - uses mecab
