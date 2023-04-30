@@ -1,5 +1,7 @@
 * mode for reading japanese
 
+[[./screenshot.png]]
+
 This is work in progress.
 
 - [X] tokenize and colour text according to type of token
