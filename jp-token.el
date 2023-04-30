@@ -23,6 +23,11 @@
   (emacsql-close my-status-db)
   )
 
+(defun my-get-time-date ()
+  (format-time-string "%Y-%m-%d %H:%M" (current-time))
+  
+  )
+
 (defun my-db-create ()
   (when (file-exists-p my-status-db-file) 
     (signal 'file-error (format "the file already exist [%s]" my-status-db-file))
@@ -54,7 +59,7 @@
 
 (defun my-db-morph-status-insert (root wtype status)
   (let (
-        (today "today")
+        (today (my-get-time-date))
         )
                                         ;
      (emacsql my-status-db [:insert :into words
@@ -188,6 +193,18 @@
   (setq patito32 (my-command-on-buffer))
   )
 
+(defface my-face-unknown
+  '((t (:bold t)))
+  "Face for bold text."
+  :group 'my
+  )
+
+(defface my-face-learning
+  '((t (:underline t)))
+  "Face for bold text."
+  :group 'my
+  )
+  
 (defface my-face-noun
   `((((class color) (background light))
      (:foreground  "blue"))
@@ -195,6 +212,7 @@
      (:foreground  "blue")))
   "Face for nouns."
   :group 'my)
+
 
 (defface my-face-noun-alt
   `((((class color) (background light))
@@ -252,6 +270,33 @@
   "Face for particles."
   :group 'my)
 
+(defface my-face-noun-unknown
+  '((t (:inherit my-face-noun :bold t)))
+  "Face for noun unknown")
+
+(defface my-face-particle-unknown
+  '((t (:inherit my-face-particle :bold t)))
+  "Face for particle unknown")
+
+(defface my-face-verb-unknown
+  '((t (:inherit my-face-verb :bold t)))
+  "Face for verb unknown")
+
+(defface my-face-adverb-unknown
+  '((t (:inherit my-face-adverb :bold t)))
+  "Face for Adverb unknown")
+
+(defface my-face-punctuation-unknown
+  '((t (:inherit my-face-punctuation :bold t)))
+  "Face for punctuation unknown")
+
+(defface my-face-morpheme-unknown
+  '((t (:inherit my-face-morpheme :bold t)))
+  "Face for morpheme unknown")
+
+(defface my-face-adjective-unknown
+  '((t (:inherit my-face-adjective :bold t)))
+  "Face for adjective unknown")
 
 
 (defvar my-wtype-table '(
@@ -264,6 +309,15 @@
                          ("形容詞" . my-face-adjective)
                          ))
 
+(defvar my-wtype-table-status-unknown'(
+                         ("名詞" . my-face-noun-unknown)
+                         ("助詞" . my-face-particle-unknown)
+                         ("動詞" . my-face-verb-unknown)
+                         ("副詞" . my-face-adverb-unknown)
+                         ("記号" . my-face-punctuation-unknown)
+                         ("助動詞" . my-face-morpheme-unknown)
+                         ("形容詞" . my-face-adjective-unknown)
+                         ))
 
 (defun my-has-japanese-characters-p (str)
   "Check if STR has any Japanese characters."
@@ -271,26 +325,108 @@
   
   )
 
+(defun my-font-table-to-use (status)
+  (cond 
+   ((string-equal "known" status)  my-wtype-table)
+   (my-wtype-table-status-unknown)
+   )
+  
+  )
 
-(defun my-set-text-prop (token face)
+(defun my-morph-new-status (props new-status)
+  "mark morph at point as new status"
+  (let* (
+         (root (plist-get props   'root))
+         (wtype (plist-get props  'wtype))
+         (status (plist-get props 'status))
+         (beg (plist-get props    'begin))
+         (end (plist-get props    'end))
+         )
+    (message "after let [%s] [%s] [%s]-> [%s] " root wtype status new-status)
+    (message "   begin end [%s] [%s]" beg end)
+    (if (not (string-equal status new-status))
+        (let (
+              (face (my-wtype-status-to-face wtype new-status))
+              (ovl (make-overlay beg end))
+              )
+          (message "setting new status [%s] from [%s]" new-status status)
+          (my-morph-status-set root wtype new-status)
+          (if face
+              (progn
+                (message "setting face %s" face)
+                (overlay-put ovl 'font-lock-face face)
+                )
+            )
+          )
+        )
+    ))
+
+(defun my-morph-set-known ()
+  (interactive)
+  (let* (
+         (pos (point))
+         (props (text-properties-at pos))
+         )
+    (if (and props)
+        (plist-get props 'root)
+        )
+    (my-morph-new-status props "known")
+    )
+  
+  
+  )
+
+(defun my-wtype-status-to-face (wtype status)
+                                        ;  (and
+  (message "inside my-wtype-status-to-face [%s][%s]" wtype status)
+  (let* (
+        (font-table (my-font-table-to-use status))
+        (face (assoc wtype font-table))
+        )
+    (message "inside let [%s]" face)
+    (and face
+        (cdr face)
+        )
+    )   
+  )
+
+
+(defun my-set-text-prop-token (token)
   (let*
       (
        (beg (plist-get token 'begin))
+       (root (plist-get token 'root))
+       (wtype (plist-get token 'wtype))
+       (surface (plist-get token 'surface))
+       (status (my-morph-status-get root wtype))
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
        (ovl (make-overlay beg end))
+       (face (my-wtype-status-to-face wtype status))
        )
-    (message "setting face %s" token)
     (overlay-put ovl 'my t)
-    (overlay-put ovl 'font-lock-face face)
-    (put-text-property beg end 'root (plist-get token 'root))
-    (put-text-property beg end 'surface (plist-get token 'surface))
+    (if face
+        (progn
+          (message "setting face %s" face)
+          (overlay-put ovl 'font-lock-face face)
+          )
+      )
+    (if status
+        (put-text-property beg end 'status status)
+      )
+    (put-text-property beg end 'begin beg)
+    (put-text-property beg end 'end end)
+    (put-text-property beg end 'status status)
+    (put-text-property beg end 'wtype  wtype)
+    (put-text-property beg end 'root root)
+    (put-text-property beg end 'surface surface)
     ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
                        (my-katakana-to-hiragana (plist-get token 'pronun)))
-;    (put-text-property beg end 'face  face)
+                                        ;    (put-text-property beg end 'face  face)
   ))
 
-(defun my-token-wtype-to-face (token)
+
+(defun my-process-wtype-p (token)
   (and
    (assoc (plist-get token 'wtype) my-wtype-table)
 ;   (my-has-japanese-characters-p (plist-get token 'surface))
@@ -302,15 +438,45 @@
     (dolist (token jpTokens)
       
       (if (my-has-japanese-characters-p (plist-get token 'surface))
-          (let(
-               (face (my-token-wtype-to-face token))
-               )
-            (if face
-                (my-set-text-prop token face)
-              
-              )
+          (if (my-process-wtype-p token)
+              (my-set-text-prop-token token)            
             )
+        
         )    
+      )
+    )
+  )
+
+(defun my-extract-term-at-point ()
+    (interactive)
+    (let* ((pos (point))
+           (props (text-properties-at pos))
+           (term (and props
+                      (plist-get props 'root)
+                      ))
+           )
+      (if term
+          (message "%s" term)
+        (error "no japanese text under point (perhaps it has not been parsed)")
+        )
+      )
+    )
+
+
+(defun my-define-at-point ()
+  "show definition of the currently selected word in a tooltip and a message. Keeps a log
+   of searched words in a buffer too. Uses myougiden."
+  (interactive)
+  (save-excursion
+    (let* (
+           (term (my-extract-term-at-point))
+           (definition (dmg-run-dictionary term))
+           )
+      (if (> (length definition) 0)
+          (dmg-show-definition definition)
+                                        ; else
+        (message (format "Term [%s] not found" term))
+        )
       )
     )
   )
