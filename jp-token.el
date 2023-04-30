@@ -44,7 +44,7 @@
 (defun my-db-morph-status-get (root wtype surface)
   ;; since it is a singleton, remove wrapping list
   ;; nth returns nil if the list is empty
-  (message "get db [%s %s %s]" root wtype surface)
+;  (message "get db [%s %s %s]" root wtype surface)
   (nth 0;
        (emacsql my-status-db [:select [morph mtype status date]
                                       :from words
@@ -84,7 +84,7 @@
           (
            (status (nth 2
                         (my-db-morph-status-get root wtype surface))))
-        (message "gone to the db [%s]" status)
+;        (message "gone to the db [%s]" status)
         (puthash (list root wtype surface)
                  status
                  my-status-table)        
@@ -92,7 +92,7 @@
     ))
 
 (defun my-morph-status-set (root wtype surface status)
-  (message "entering")
+;  (message "entering")
   (let(
        (curval (my-morph-status-get root wtype surface))
        )
@@ -100,7 +100,6 @@
                  (string-equal curval status)
              )
       ;; cache does not have it or it is different
-      (message "here")
       (my-db-morph-status-update root wtype surface status)
       (puthash (list root wtype surface) status my-status-table)
       )
@@ -133,7 +132,7 @@
        (jpTokens (my-process-filter outputMecab))
        
        )
-    (message "finished %d tokens" (length jpTokens))
+    (message "finished mecab processng %d tokens" (length jpTokens))
     ;; process the tokens
     (my-process-tokens jpTokens)
     )
@@ -145,7 +144,6 @@
    reusing an existing shell command process buffer if one exists.
    When it ends, process the output."
   (interactive)
-  (message "entering")
   ;; kill the buffer if it exists
   (kill-buffer my-process-buffer)
   (let (
@@ -165,6 +163,7 @@
       (while (accept-process-output process))
       (message "mecab Done")
       (my-process-mecab)
+      (message "finisheb pressing buffer")
       )      
     )
   )
@@ -347,18 +346,18 @@
          (beg (plist-get props    'begin))
          (end (plist-get props    'end))
          )
-    (message "after let [%s] [%s] [%s]-> [%s] " root wtype status new-status)
-    (message "   begin end [%s] [%s]" beg end)
+;    (message "after let [%s] [%s] [%s]-> [%s] " root wtype status new-status)
+;    (message "   begin end [%s] [%s]" beg end)
     (if (not (string-equal status new-status))
         (let (
               (face (my-wtype-status-to-face wtype new-status))
               (ovl (make-overlay beg end))
               )
-          (message "setting new status [%s] from [%s]" new-status status)
+;          (message "setting new status [%s] from [%s]" new-status status)
           (my-morph-status-set root wtype surface new-status)
           (if face
               (progn
-                (message "setting face %s" face)
+;                (message "setting face %s" face)
                 (overlay-put ovl 'font-lock-face face)
                 )
             )
@@ -383,12 +382,12 @@
 
 (defun my-wtype-status-to-face (wtype status)
                                         ;  (and
-  (message "inside my-wtype-status-to-face [%s][%s]" wtype status)
+;  (message "inside my-wtype-status-to-face [%s][%s]" wtype status)
   (let* (
         (font-table (my-font-table-to-use status))
         (face (assoc wtype font-table))
         )
-    (message "inside let [%s]" face)
+;    (message "inside let [%s]" face)
     (and face
         (cdr face)
         )
@@ -411,7 +410,7 @@
     (overlay-put ovl 'my t)
     (if face
         (progn
-          (message "setting face %s" face)
+;          (message "setting face %s" face)
           (overlay-put ovl 'font-lock-face face)
           )
       )
@@ -503,7 +502,6 @@
          (lines (split-string output "\n" t))
          (tokens  (mapcar #'my-mecab-process-line lines))         ;
          )
-    (message "hello world %s" (car tokens))
     (my-sync-list-to-st
      tokens
      (buffer-substring (point-min) (point-max))
@@ -527,7 +525,7 @@ Properties is a property-list with information about the
                                         
     (if (string-equal "EOS" surface)  ; EOS is a line end
         (setq surface "\n"))
-    (message "Line [%s] surface [%s] [%d]" line surface (string-width surface))
+;    (message "Line [%s] surface [%s] [%d]" line surface (string-width surface))
     (list 'surface surface 'wtype wtype 'root root 'pronun pronun)
     ))
 )
@@ -568,9 +566,9 @@ Properties is a property-list with information about the
             ;; just in case we get into an infinite loop, or the input is humongous
             
             (setq counter (+ counter 1))
-            (message "current next [%s]" (my-until-eoln st))
-            (message "    next token [%s]" nextToken)
-            (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
+ ;           (message "current next [%s]" (my-until-eoln st))
+;            (message "    next token [%s]" nextToken)
+;            (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
             
             (if (string-equal next prefix ) ; test matches
                 (let ((endpos (+ position nextLen -1))
@@ -581,7 +579,7 @@ Properties is a property-list with information about the
                     (plist-put nextToken 'end   endpos)
                     (setq position (+ endpos 1))
                     (add-to-list 'output nextToken t)
-                    (message "    + it matches!! remaining chars %d [%s]" (length st) nextToken)
+;                    (message "    + it matches!! remaining chars %d [%s]" (length st) nextToken)
                     (setq lst (cdr lst))
                 ))
               ; does not match
@@ -598,7 +596,7 @@ Properties is a property-list with information about the
                 (progn
                   (setq st (substring st skip))
                   (add-to-list 'output newToken  t)
-                  (message "   > does not match. new token [%s]" newToken)
+;                  (message "   > does not match. new token [%s]" newToken)
                   (setq position (+ endpos 1))
                   )))
             
@@ -611,3 +609,22 @@ Properties is a property-list with information about the
         )
       output
       )))
+
+(defvar my-minor-map (make-sparse-keymap)
+  "Keymap used my-minor mode")
+
+(define-key my-minor-map (kbd "i") 'my-prop-at-point)
+(define-key my-minor-map (kbd "d") 'my-define-at-point)
+
+(define-minor-mode my-minor-mode
+  "my help"
+
+  :global t
+  :lighter   "_jp_"    ; lighter
+  :keymap my-minor-map             ; keymap
+
+  ;; if disabling `undo-tree-mode', rebuild `buffer-undo-list' from tree so
+  ;; Emacs undo can work
+  )
+
+
