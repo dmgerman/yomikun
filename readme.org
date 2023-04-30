@@ -8,7 +8,115 @@ This is work in progress.
      - similar to migaku
      - data saved in a SQLite database
 - [ ] display dictionary (similar to yomichan)
-  
 - [ ] put all together
+- [ ] slow in very long texts 
+
+* Nomenclature
+
+- a Japanese text is composed of a sequence of tokens, some of them non-japanese.
+- mecab converts the input text into a sequence of tokens
+- a morph (see morphman) is a Japanese word as it is learned
+  - it is composed of 3 parts:
+    1. surface. The version of the root known/learned
+    2. root. the actual word
+    3. type. the grammatical type of word
+- this module keeps track of the learned status of a word:
+  - ignore:we don't care for it, i.e. names, or interjections)
+  - known: the surface of the word (i.e. seen version of the root, eg. たベル vs 食べる) is known
+
+* mecab parsing
+
+From each sentence we obtain the root, the type of word, and the surface (kanji/hiragana version seen). For example:
+
+#+begin_example
+美味しい寿司を食べた。おいしくないすしはたべられない
+#+end_example
+
+#+name: mecab
+#+begin_src bash :results verbatim :exports both
+echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh
+#+end_src
+
+#+RESULTS:
+#+begin_example
+美味しい	形容詞,一般,*,*,形容詞,連体形-一般,オイシイ,美味しい,美味しい,オイシー,美味しい,オイシー,和,*,*,*,*,*,*,相,オイシイ,オイシイ,オイシイ,オイシイ,"0,3",C2,*,1201225110528705,4370
+寿司	名詞,普通名詞,一般,*,*,*,スシ,寿司,寿司,スシ,寿司,スシ,和,ス濁,基本形,*,*,*,*,体,スシ,スシ,スシ,スシ,"1,2",C3,*,5269967956222464,19172
+を	助詞,格助詞,*,*,*,*,ヲ,を,を,オ,を,オ,和,*,*,*,*,*,*,格助,ヲ,ヲ,ヲ,ヲ,*,"動詞%F2@0,名詞%F1,形容詞%F2@-1",*,11381878116459008,41407
+食べ	動詞,一般,*,*,下一段-バ行,連用形-一般,タベル,食べる,食べ,タベ,食べる,タベル,和,*,*,*,*,*,*,用,タベ,タベル,タベ,タベル,2,C1,M4@1,6220495691326081,22630
+た	助動詞,*,*,*,助動詞-タ,終止形-一般,タ,た,た,タ,た,タ,和,*,*,*,*,*,*,助動,タ,タ,タ,タ,*,"動詞%F2@1,形容詞%F4@-2",*,5948916285711019,21642
+。	補助記号,句点,*,*,*,*,*,。,。,*,。,*,記号,*,*,*,*,*,*,補助,*,*,*,*,*,*,*,6880571302400,25
+おいしく	形容詞,一般,*,*,形容詞,連用形-一般,オイシイ,美味しい,おいしく,オイシク,おいしい,オイシー,和,*,*,*,*,*,*,相,オイシク,オイシイ,オイシク,オイシイ,"0,3",C2,*,1201225076974209,4370
+ない	形容詞,非自立可能,*,*,形容詞,連体形-一般,ナイ,無い,ない,ナイ,ない,ナイ,和,*,*,*,*,*,*,相,ナイ,ナイ,ナイ,ナイ,1,C3,*,7543208145986241,27442
+すし	名詞,普通名詞,一般,*,*,*,スシ,寿司,すし,スシ,すし,スシ,和,ス濁,基本形,*,*,*,*,体,スシ,スシ,スシ,スシ,"1,2",C3,*,5269967855559168,19172
+は	助詞,係助詞,*,*,*,*,ハ,は,は,ワ,は,ワ,和,*,*,*,*,*,*,係助,ハ,ハ,ハ,ハ,*,"動詞%F2@0,名詞%F1,形容詞%F2@-1",*,8059703733133824,29321
+たべ	動詞,一般,*,*,下一段-バ行,未然形-一般,タベル,食べる,たべ,タベ,たべる,タベル,和,*,*,*,*,*,*,用,タベ,タベル,タベ,タベル,2,C1,M4@1,6220495657771585,22630
+られ	助動詞,*,*,*,助動詞-レル,未然形-一般,ラレル,られる,られ,ラレ,られる,ラレル,和,*,*,*,*,*,*,助動,ラレ,ラレル,ラレ,ラレル,*,動詞%F3@2,M4@1,10936575907209793,39787
+ない	助動詞,*,*,*,助動詞-ナイ,終止形-一般,ナイ,ない,ない,ナイ,ない,ナイ,和,*,*,*,*,*,*,助動,ナイ,ナイ,ナイ,ナイ,*,動詞%F3@0,*,7542108634358443,27438
+EOS
+#+end_example
 
 
+This output is reduced to the following. The first column is the word as seen, the second the type, then the morph, and
+finally the surface. Compare 美味しい and おいしい.
+
+#+begin_src bash :results verbatim :exports both
+echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh | csvcut -c 1,8,11
+#+end_src
+
+#+RESULTS:
+#+begin_example
+美味しい	形容詞,美味しい,美味しい
+寿司	名詞,寿司,寿司
+を	助詞,を,を
+食べ	動詞,食べる,食べる
+た	助動詞,た,た
+。	補助記号,。,。
+おいしく	形容詞,美味しい,おいしい
+ない	形容詞,無い,ない
+すし	名詞,寿司,すし
+は	助詞,は,は
+たべ	動詞,食べる,たべる
+られ	助動詞,られる,られる
+ない	助動詞,ない,ない
+EOS,,
+#+end_example
+
+
+This text would be stored as follows in the database. Note that 寿司 and 美味しい are stored twice. One for each version (kanji and hiragana).
+
+
+#+begin_src bash :results raw :exports results
+echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh | csvcut -c 1,8,11 | csvcut -t -c 2 -u 3
+#+end_src
+
+| wtype  | root   | surface |
+|--------+--------+---------|
+| 助動詞  | た      | た       |
+| 助動詞  | ない    | ない     |
+| 助動詞  | られる  | られる   |
+| 助詞    | は      | は       |
+| 助詞    | を      | を       |
+| 動詞    | 食べる  | たべる   |
+| 動詞    | 食べる  | 食べる   |
+| 名詞    | 寿司    | すし     |
+| 名詞    | 寿司    | 寿司     |
+| 形容詞  | 無い    | ない     |
+| 形容詞  | 美味しい | おいしい  |
+| 形容詞  | 美味しい | 美味しい  |
+
+
+
+* TO DOs
+
+- [ ] syncing text and mecab. is by far, the slowest
+- [ ] keeping only one overlay per morph, rather than one per token in the text
+- [ ] updating when a token is marked as known
+
+
+
+* syncing text and mecab
+    processing the mecab output to match the buffer with the output is extremely slow.
+    i think it is because I am consuming the string rather than processing it.
+    it should process th
+ 
+  
