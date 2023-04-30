@@ -4,12 +4,17 @@ This is work in progress.
 
 - [X] tokenize and colour text according to type of token
   - uses mecab
+- [ ] operate in regions    
 - [ ] typeset the text according to learning status (still to be completed)
-     - similar to migaku
-     - data saved in a SQLite database
+  - similar to migaku
+  - data saved in a SQLite database
 - [ ] display dictionary (similar to yomichan)
-- [ ] put all together
-- [ ] slow in very long texts 
+- [ ] update typesetting of word when status changed  
+- [ ] put all together into a minor local mode
+- [X] very slow in very long texts
+- [ ] make it async
+- [ ] the number of morphs known by a person is probably small. it might be faster to
+     cash them into the memoized table rather than having to look them up once at a time
 
 * Nomenclature
 
