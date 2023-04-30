@@ -1,9 +1,9 @@
 * mode for reading japanese
 
 - tokenize Japanese text
-- keep track of reading status of works (similar to Anki's morphan and Migaku)
+- keep track of reading status of works (similar to Anki's [[https://ankiweb.net/shared/info/900801631][morphan]] and [[https://ankiweb.net/shared/info/900801631][Migaku]])
 - overlay information about the definition and pronunciation of current word
-   (similar to Yomichan)
+   (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 
 #+ATTR_HTML: :width 100
 #+ATTR_ORG: :width 800px
@@ -13,18 +13,32 @@
 * This is work in progress.
 
 - [X] tokenize and colour text according to type of token
-  - uses mecab
-- [ ] operate in regions    
-- [ ] typeset the text according to learning status (still to be completed)
-  - similar to migaku
-  - data saved in a SQLite database
-- [ ] display dictionary (similar to yomichan)
-- [ ] update typesetting of word when status changed  
-- [ ] put all together into a minor local mode
-- [X] very slow in very long texts
+- [X] typeset the text according to learning status (still to be completed)
+  - [X] known status saved in a SQLite database
+  - [ ] ability to change status interactively
+- [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
+- [ ] support pitch accent
+- [ ] add info for N-levels
 - [ ] make it async
+- [ ] put all together into a minor local mode
+- [ ] operate in regions    
+- [ ] create reports of "readability"
+- [ ] support for morphman and anki  
+
+* dictionary
+
+Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
+
+* speed
+
+Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in 20-30 seconds.
+
+Avenues for improvement:
+
 - [ ] the number of morphs known by a person is probably small. it might be faster to
      cash them into the memoized table rather than having to look them up once at a time
+
+
 
 * Nomenclature
 
@@ -36,8 +50,9 @@
     2. root. the actual word
     3. type. the grammatical type of word
 - this module keeps track of the learned status of a word:
-  - ignore:we don't care for it, i.e. names, or interjections)
+  - ignore: we don't care for it, i.e. names, or interjections)
   - known: the surface of the word (i.e. seen version of the root, eg. たベル vs 食べる) is known
+- if the morph is not in the db, it means it is unknown
 
 * mecab parsing
 
