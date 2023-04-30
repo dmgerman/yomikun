@@ -108,15 +108,14 @@ echo "美味しい寿司を食べた。おいしくないすしはたべられ�
 
 * TO DOs
 
-- [ ] syncing text and mecab. is by far, the slowest
+- [ ] see if we can reuse overlays. but seems to be lower priority
+- [ ] slowest part is looking up known words
 - [ ] keeping only one overlay per morph, rather than one per token in the text
-- [ ] updating when a token is marked as known
+- [ ] updating when a token status is changed
+- [ ] does not work with selected region yet
+- [ ] the mecab process hangs when lines are too long... seems to be an emacs problem
 
-
-
-* syncing text and mecab
-    processing the mecab output to match the buffer with the output is extremely slow.
-    i think it is because I am consuming the string rather than processing it.
-    it should process th
  
   
+
+

@@ -151,7 +151,8 @@
    When it ends, process the output."
   (interactive)
   ;; kill the buffer if it exists
-  (kill-buffer my-process-buffer)
+  (if (bufferp my-process-buffer)
+      (kill-buffer my-process-buffer))
   (let (
         (process (or (get-process my-process-name)
                       (start-process-shell-command my-process-name my-process-buffer my-command)
