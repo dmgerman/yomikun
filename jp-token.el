@@ -16,7 +16,9 @@
     (when (not (file-exists-p my-status-db-file))
       (signal 'file-error (format "the file does not exist [%s]" my-status-db-file))
       )
-    (setq my-status-db (emacs-sqlite my-status-db-file))
+    ;; only open it if it is not open
+    (when (not my-status-db)
+     (setq my-status-db (emacs-sqlite my-status-db-file)))
     )
 
 (defun my-db-close()
@@ -33,73 +35,75 @@
     (signal 'file-error (format "the file already exist [%s]" my-status-db-file))
     )
   (setq my-status-db (emacsql-sqlite my-status-db-file))
-  (emacsql my-status-db [:create-table words ([morph mtype status date]
-                                              (:primary-key [morph mtype])
+  (emacsql my-status-db [:create-table words ([morph mtype surface status date]
+                                              (:primary-key [morph mtype surface])
                                               )])
   )
 
 
-(defun my-db-morph-status-get (root wtype)
+(defun my-db-morph-status-get (root wtype surface)
   ;; since it is a singleton, remove wrapping list
   ;; nth returns nil if the list is empty
-  (message "[%s %s]" root wtype)
+  (message "get db [%s %s %s]" root wtype surface)
   (nth 0;
        (emacsql my-status-db [:select [morph mtype status date]
                                       :from words
-                                      :where (and (= morph $s1) (= mtype $s2))
-                                      ] root wtype)
+                                      :where (and (= morph $s1) (= mtype $s2) (=surface $s3))
+                                      ] root wtype surface) 
   ))
 
-(defun my-db-morph-status-delete (root wtype)
+(defun my-db-morph-status-delete (root wtype surface)
   (emacsql my-status-db [:delete 
                             :from words
-                            :where (and (= morph $s1) (= mtype $s2))
-                          ] root wtype)
+                            :where (and (= morph $s1) (= mtype $s2) (= surface $s3))
+                          ] root wtype surface)
   )
 
-(defun my-db-morph-status-insert (root wtype status)
+(defun my-db-morph-status-insert (root wtype surface status)
   (let (
         (today (my-get-time-date))
         )
                                         ;
      (emacsql my-status-db [:insert :into words
-                              :values ([$s1 $s2 $s3 $s4])] root wtype status today)
+                              :values ([$s1 $s2 $s3 $s4 $s5])] root wtype surface status today)
      ))
 
-(defun my-db-morph-status-update (root wtype status)
-  (my-db-morph-status-delete root wtype)
-  (my-db-morph-status-insert root wtype status)
+(defun my-db-morph-status-update (root wtype surface status)
+  (my-db-morph-status-delete root wtype surface)
+  
+  (if (not (string-equal status "unknown"))
+   (my-db-morph-status-insert root wtype surface status))
   )
 
 (setq my-status-table (make-hash-table :test 'equal))
 
-(defun my-morph-status-get (root wtype)
+(defun my-morph-status-get (root wtype surface)
   ;; memoize the status of the given morph
-  (or (gethash (list root wtype) my-status-table)
+  (or (gethash (list root wtype surface) my-status-table)
       (let
           (
            (status (nth 2
-                        (my-db-morph-status-get root wtype))))
+                        (my-db-morph-status-get root wtype surface))))
         (message "gone to the db [%s]" status)
-        (puthash (list root wtype)
+        (puthash (list root wtype surface)
                  status
                  my-status-table)        
         )        
     ))
 
-(defun my-morph-status-set (root wtype status)
+(defun my-morph-status-set (root wtype surface status)
   (message "entering")
   (let(
-       (curval (my-morph-status-get root wtype))
+       (curval (my-morph-status-get root wtype surface))
        )
     (unless (and curval
                  (string-equal curval status)
              )
       ;; cache does not have it or it is different
       (message "here")
-      (my-db-morph-status-update root wtype status)
-      (puthash (list root wtype) status my-status-table)
-         )
+      (my-db-morph-status-update root wtype surface status)
+      (puthash (list root wtype surface) status my-status-table)
+      )
     ))
 
 
@@ -339,6 +343,7 @@
          (root (plist-get props   'root))
          (wtype (plist-get props  'wtype))
          (status (plist-get props 'status))
+         (surface (plist-get props 'surface))
          (beg (plist-get props    'begin))
          (end (plist-get props    'end))
          )
@@ -350,7 +355,7 @@
               (ovl (make-overlay beg end))
               )
           (message "setting new status [%s] from [%s]" new-status status)
-          (my-morph-status-set root wtype new-status)
+          (my-morph-status-set root wtype surface new-status)
           (if face
               (progn
                 (message "setting face %s" face)
@@ -398,7 +403,7 @@
        (root (plist-get token 'root))
        (wtype (plist-get token 'wtype))
        (surface (plist-get token 'surface))
-       (status (my-morph-status-get root wtype))
+       (status (my-morph-status-get root wtype surface))
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
        (ovl (make-overlay beg end))
        (face (my-wtype-status-to-face wtype status))
@@ -434,6 +439,8 @@
   )
 
 (defun my-process-tokens(jpTokens)
+  ;; make sure database is open
+  (my-db-open)
   (with-silent-modifications
     (dolist (token jpTokens)
       
@@ -557,10 +564,9 @@ Properties is a property-list with information about the
                (nextLen  (length next))
                (prefix (substring st 0 nextLen))
                )
-          (progn
+          (if (< counter my-max-tokens-to-process)
             ;; just in case we get into an infinite loop, or the input is humongous
-            (if (> counter my-max-tokens-to-process)
-                (aborort))
+            
             (setq counter (+ counter 1))
             (message "current next [%s]" (my-until-eoln st))
             (message "    next token [%s]" nextToken)
