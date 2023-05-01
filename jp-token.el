@@ -140,7 +140,9 @@
       (
        ;; get raw mecab output
        (output (with-current-buffer my-process-buffer
-                 (buffer-substring-no-properties (point-min) (point-max)))
+                 (progn
+                   (buffer-substring-no-properties (point-min) (point-max)))
+                 )
                )
        ;; remove end marker
        (message "done processing raw mecab")
@@ -165,7 +167,13 @@
   ;; kill the buffer if it exists
   (if (bufferp my-process-buffer)
       (kill-buffer my-process-buffer))
+  ;; create buffer and remove undo
+;;    (with-current-buffer (get-buffer-create my-process-buffer)
+;;    (setq buffer-undo-list nil);
+;;    )
+
   (let (
+        
         (process (or (get-process my-process-name)
                       (start-process-shell-command my-process-name my-process-buffer my-command)
                       )                 
@@ -174,7 +182,7 @@
     (progn
       ;; async input is buffered and we do not want to process
       ;; incomplete lines. So wait until all output is created and process it
-      (setq process-adaptive-read-buffering nil)
+      (setq process-adaptive-read-buffering t)
       (message "process starting")
       (process-send-region process (point-min) (point-max))
       (message "process sent")
