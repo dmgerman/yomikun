@@ -1,5 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 
+;; overlay code based on https://github.com/katspaugh/kuromoji.el
+
+
+
+
 (defvar my-command "echo" "Shell command to run on buffer contents")
 (defvar my-process-name "jp-process")
 
@@ -48,13 +53,16 @@
 (defun my-db-morph-status-get (root wtype surface)
   ;; since it is a singleton, remove wrapping list
   ;; nth returns nil if the list is empty
-;  (message "get db [%s %s %s]" root wtype surface)
-  (nth 0;
+  ;;  (message "get db [%s %s %s]" root wtype surface)
+  
+  (or (nth 0;
        (emacsql my-status-db [:select [morph mtype status date]
                                       :from words
                                       :where (and (= morph $s1) (= mtype $s2) (=surface $s3))
                                       ] root wtype surface) 
-  ))
+       )
+      (list nil nil "unknown" nil))
+  )
 
 (defun my-db-morph-status-delete (root wtype surface)
   (emacsql my-status-db [:delete 
@@ -81,13 +89,17 @@
 
 (setq my-status-table (make-hash-table :test 'equal))
 
+(setq my-repeat-counter 0)
+
 (defun my-morph-status-get (root wtype surface)
   ;; memoize the status of the given morph
   (or (gethash (list root wtype surface) my-status-table)
       (let
           (
            (status (nth 2
-                        (my-db-morph-status-get root wtype surface))))
+                        (my-db-morph-status-get root wtype surface)))
+           )
+        (setq my-repeat-counter (+ my-repeat-counter 1))
 ;        (message "gone to the db [%s]" status)
         (puthash (list root wtype surface)
                  status
@@ -171,6 +183,7 @@
       (message "mecab Done")
       (my-process-mecab)
       (message "finisheb pressing buffer")
+      (kill-buffer my-process-buffer)
       )      
     )
   )
@@ -180,10 +193,6 @@
   (message "%s" (point))
   )
               
-;(my-sync-list-to-st
-;         (buffer-substring (point-min) (point-max))
-;         )
-
 (defun my-until-eoln (st)
   (substring st 0 (string-match "\n" st))
   )
@@ -364,7 +373,7 @@
           (my-morph-status-set root wtype surface new-status)
           (if face
               (progn
-;                (message "setting face %s" face)
+                ;;                (message "setting face %s" face)
                 (overlay-put ovl 'font-lock-face face)
                 )
             )
@@ -420,6 +429,7 @@
         (progn
 ;          (message "setting face %s" face)
           (overlay-put ovl 'font-lock-face face)
+          (overlay-put ovl 'my-name t)
           )
       )
     (if status
@@ -427,14 +437,12 @@
       )
     (put-text-property beg end 'begin beg)
     (put-text-property beg end 'end end)
-    (put-text-property beg end 'status status)
     (put-text-property beg end 'wtype  wtype)
     (put-text-property beg end 'root root)
     (put-text-property beg end 'surface surface)
     ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
                        (my-katakana-to-hiragana (plist-get token 'pronun)))
-                                        ;    (put-text-property beg end 'face  face)
   ))
 
 
@@ -555,6 +563,13 @@ Properties is a property-list with information about the
     running-lengths))
 
 (defun my-sync-list-to-st (lst st)
+  "Unfortunately mecab does not output all characters (e.g. spaces). This means
+  we need to find out where in the text each token is.
+
+  This function returns a set of tokens that include the position (beg, end) where
+  they occur.
+
+"
   (message "entering [%s]" (my-until-eoln st))
   (message "%s " (car lst))
   (let (
@@ -562,7 +577,6 @@ Properties is a property-list with information about the
         (counter 0)
         (offset 0)
         (lenSt (length st))
-        (position 1)
       )
     (progn
       (while (and (> lenSt offset)
@@ -576,62 +590,53 @@ Properties is a property-list with information about the
 ;          (message "entering iteration %d offset %d lenSt %d len tokens [%d] next [%s]" counter offset lenSt (length lst) (nth 0 lst))
           (if (< counter my-max-tokens-to-process)
             ;; just in case we get into an infinite loop, or the input is humongous
-            
               (progn
                 (setq counter (+ counter 1))
-                ;;(message "current next [%s]" (my-until-eoln st))
-                ;;(message "    next token [%s]" nextToken)
-                ;;(message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
+  ;              (message "[%d]current string [%d] [%s]" counter offset (my-until-eoln (substring st offset)))
+;                (message "    next token [%s]" nextToken)
+;                (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
                 (if (string-equal next prefix ) ; test matches
-                    (let ((endpos (+ position nextLen -1))
+                    (let ((endpos (+ offset nextLen ))
                           ) 
                       (progn
-                        (setq offset (+ offset nextLen))
                                         ;                    (setq st (substring st nextLen))
-                        (plist-put nextToken 'begin position)
+                        (plist-put nextToken 'begin (+ offset 1))
                         (plist-put nextToken 'end   endpos)
-                        (setq position (+ endpos 1))
+;                        (setq position (+ endpos 1))
                         (push nextToken output)
                         ;;(add-to-list 'output nextToken t)
-                        ;;(message "    + it matches!! offset %d [%s]" offset nextToken)
+ ;                       (message "    + it matches!! offset %d [%s]" offset nextToken)
                         (setq lst (cdr lst))
+                        (setq offset (+ offset nextLen))
                         ))
                                         ; does not match
                   (let* (
-                         ;; search from offset
+                         ;; search from offset for the next token
+                         ;; TODO: do not add a new token, it is not needed.
+                         ;;     simply advance the caracter being inspected
                          (skip (cl-search next (substring st offset))) ;; text that is skipped
-                         (newSeen (substring st offset (+ skip offset)))
-                         (endpos (+ position skip -1))
+                         ;;(newSeen (substring st offset (+ skip offset)))
+                         ;;(endpos (+ position skip -1))
                          ;; the next line is not really necessary
                          ;; unless we require that the list of tokens
                          ;; represent ALL the text (i.e. the text
                          ;; can be regenerated from the tokens)
-                         (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
+;                         (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
                          )
                     (progn
+                      (if (not skip)
+                          (error "something went wrong. Unable to match mecab to text") 
+                          )
                       (setq offset (+ offset skip))
-                      ;;(setq st (substring st skip))
-                      (push newToken output)
-                      ;;(add-to-list 'output newToken  t)
-                      ;;(message "   > does not match. new token [%s] skip [%d]q" newToken skip)
-                      (setq position (+ endpos 1))
+;                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
                       )))
- 
                 )
-
            
  ;           (message ">>>> to start another iteration [%d] [%s]" offset (nth 0 lst))
           ))
         )
-      ; left over string... 
-      (if (> lenSt offset)
-          (progn
-            (message "there was a leftover text [%s]" (substring output offset))
-            (push (list 'seen newSurface 'surface newSurface 'wtype "other")
-                  (substring output offset))
-                                        ;          (add-to-list 'output (list 'seen newSurface 'surface newSurface 'wtype "other")  t)
-            )
-        )
+      ;; left over string... 
+      ;; but if there is text left, we dont' care for it
       (nreverse output)
       )))
 
@@ -644,12 +649,11 @@ Properties is a property-list with information about the
 (define-minor-mode my-minor-mode
   "my help"
 
-  :global t
+  :global nil
   :lighter   "_jp_"    ; lighter
   :keymap my-minor-map             ; keymap
 
-  ;; if disabling `undo-tree-mode', rebuild `buffer-undo-list' from tree so
-  ;; Emacs undo can work
+  ;; this is where the code goes
   )
 
 

@@ -24,6 +24,9 @@
 - [ ] operate in regions    
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
+- [ ] rename all the variables
+- [ ] remove unnecessary code
+- [ ] reorganize code  
 
 * dictionary
 
@@ -125,13 +128,20 @@ echo "美味しい寿司を食べた。おいしくないすしはたべられ�
 
 * speed
 
-Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in 20-30 seconds.
+Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in 10-15 seconds.
 
-Avenues for improvement:
 
-- [ ] the number of morphs known by a person is probably small. it might be faster to
-     cash them into the memoized table rather than having to look them up once at a time
+- as of [2023-04-30 Sun] the profiler reports this processing Alice:
+  - 25% cpu is GC,
+    - 78% of memory is used in the process that runs mecab
+  - 21% is matching the text to mecab output
+  - 10% is processing mecab's output
+  - based on the messages to the minibuffer, ~75% is spent running mecab
+- 4.5k morphs (probably wrong due to breaking lines in wrong place)
+- 98k characters
+- mecab outputs 64k lines
 
+All this seems to indicate that the real bottleneck is running mecab.
 
 * TO DOs
 
