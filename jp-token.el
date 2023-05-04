@@ -17,7 +17,9 @@
 
 (setq my-max-tokens-to-process 100000)
 
-(defvar my-process-buffer "*jp-process-buffer*" "Name of buffer for shell command process")
+(defvar my-process-buffer "*jp-process*" "Name of buffer for shell command process")
+
+(defvar my-report-buffer "*jp-report*" "Name of buffer for shell command process")
 
 (defvar my-status-db nil) ;; instance of the db
 
@@ -41,6 +43,7 @@
   )
 
 (defun my-db-create ()
+  (interactive)
   (when (file-exists-p my-status-db-file) 
     (signal 'file-error (format "the file already exist [%s]" my-status-db-file))
     )
@@ -361,7 +364,7 @@
   
   )
 
-(defun my-morph-do-morphs (pfun cmpfun)
+(defun my-morph-do-morphs (cmpfun pfun)
   ""
   (let ((pos (point-min)))
     (while (setq pos (next-single-property-change pos 'begin))
@@ -388,7 +391,7 @@
   
   )
 
-(defun my-morphs-delete-overlays (beg end)
+(defun my-morphs-delete-overlays-at-pos (beg end)
   (message "Found at [%d:%d]" beg end)
   (dolist (overlay (overlays-in beg end))
     (message "deleting... overlay [%s]" overlay)
@@ -403,13 +406,67 @@
   (let* ((pos (point))
          (props (text-properties-at pos))
          )
+    ;; process the morphs that match this one
+    ;; and replace the overlays
     (my-morph-do-morphs
-     'my-morphs-delete-overlays
      (lambda (beg) (my-morph-matches-at props beg  )););
       )
-     )
+    'my-morphs-delete-overlays-at-pos
+    )
   )
 
+(setq my-test-all-morphs (make-hash-table :test 'equal));(list))
+;;(setq my-status-table (make-hash-table :test 'equal))
+
+(defun my-morph-get-morph-from-props (props)
+  (list
+   (plist-get props 'root)
+   (plist-get props 'wtype)
+   (plist-get props 'surface)
+   )
+  )
+
+(defun my-morph-get-from-props (props attr)
+  (plist-get props attr)
+  )
+
+
+(defun my-extract-all-morphs ()
+  (interactive)
+  (let
+      (
+       (all-morphs (make-hash-table :test 'equal) )
+       )
+    (my-morph-do-morphs
+     (lambda (beg) (plist-get props 'root))   ;; process all morphs
+     (lambda (beg end)  ;; add morphs to the hashtable
+       (let*
+           (
+            (props (text-properties-at beg))
+            (morph (my-morph-get-morph-from-props props))
+            )
+         (message "%s" props)
+         ;; increase their counter by 1
+         (puthash morph
+                  (+ (gethash morph all-morphs 0) 1)
+                  all-morphs)
+         ))
+     )
+    (message "[%s]" all-morphs)
+    all-morphs
+    )
+  )
+
+(defun my-report-morphs-status ()
+  (let (
+        (morphs (my-extract-all-morphs))
+        (buffer (create... my-report-buffer))
+        )
+    (with ...
+          (insert "...")
+          )
+    )
+  )
 
 (defun my-replace-all-overlays (root wtype surface newstatus)
                                         ;
