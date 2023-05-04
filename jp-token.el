@@ -3,7 +3,7 @@
 ;; overlay code based on https://github.com/katspaugh/kuromoji.el
 
 
-
+(require 'emacsql)
 
 (defvar my-command "echo" "Shell command to run on buffer contents")
 (defvar my-process-name "jp-process")
@@ -22,12 +22,13 @@
 (defvar my-status-db nil) ;; instance of the db
 
 (defun my-db-open ()
+  (interactive)
     (when (not (file-exists-p my-status-db-file))
       (signal 'file-error (format "the file does not exist [%s]" my-status-db-file))
       )
     ;; only open it if it is not open
     (when (not my-status-db)
-     (setq my-status-db (emacs-sqlite my-status-db-file)))
+     (setq my-status-db (emacsql-sqlite my-status-db-file)))
     )
 
 (defun my-db-close()
@@ -360,33 +361,87 @@
   
   )
 
+(defun my-morph-do-morphs (pfun cmpfun)
+  ""
+  (let ((pos (point-min)))
+    (while (setq pos (next-single-property-change pos 'begin))
+      (when (funcall cmpfun pos)
+        (funcall pfun pos (next-single-property-change pos 'begin))))))
+
+(defun my-morph-matches-at (morphProps pos)
+  (let ((pos (point))
+         (props (text-properties-at pos))
+         )
+;    (progn
+     (and (string-equal (plist-get morphProps 'root)
+                        (plist-get props 'root)
+                        )
+          (string-equal (plist-get morphProps 'wtype)
+                        (plist-get props 'wtype)
+                        )
+          (string-equal (plist-get morphProps 'surface)
+                        (plist-get props 'surface)
+                        )
+          )
+     )
+;    )
+  
+  )
+
+(defun my-morphs-delete-overlays (beg end)
+  (message "Found at [%d:%d]" beg end)
+  (dolist (overlay (overlays-in beg end))
+    (message "deleting... overlay [%s]" overlay)
+    (delete-overlay overlay))
+  
+  )
+
+
+(defun my-test-all ()
+  (interactive)
+
+  (let* ((pos (point))
+         (props (text-properties-at pos))
+         )
+    (my-morph-do-morphs
+     'my-morphs-delete-overlays
+     (lambda (beg) (my-morph-matches-at props beg  )););
+      )
+     )
+  )
+
+
+(defun my-replace-all-overlays (root wtype surface newstatus)
+                                        ;
+  ;; we need to walk the entire document, because we do not know
+  ;; 
+  )
+
 (defun my-morph-new-status (props new-status)
   "mark morph at point as new status"
   (let* (
          (root (plist-get props   'root))
          (wtype (plist-get props  'wtype))
-         (status (plist-get props 'status))
+         (old-status (plist-get props 'status))
          (surface (plist-get props 'surface))
-         (beg (plist-get props    'begin))
-         (end (plist-get props    'end))
          )
 ;    (message "after let [%s] [%s] [%s]-> [%s] " root wtype status new-status)
 ;    (message "   begin end [%s] [%s]" beg end)
-    (if (not (string-equal status new-status))
-        (let (
-              (face (my-wtype-status-to-face wtype new-status))
-              (ovl (make-overlay beg end))
-              )
-;          (message "setting new status [%s] from [%s]" new-status status)
+    (if (not (string-equal old-status new-status))
+        (progn
+          (message "setting new status [%s] old [%s]" new-status old-status)
+          (message "   root [%s] wtype [%s] surface [%s]" root wtype surface)
+          ; we need to set the status of that word everywhere...
           (my-morph-status-set root wtype surface new-status)
-          (if face
-              (progn
-                ;;                (message "setting face %s" face)
-                (overlay-put ovl 'font-lock-face face)
-                )
-            )
+          ;; now we have to process the document to find instances of the word
+          ;; ... there is a need for a redo buffer
+          ;; but that is expensive, soo simply scan the document
+          ;; and find any instances of the morph
+          ;; and change its property
+          ;; first remove all overlays in the file
+          (my-replace-all-overlays root wtype surface new-status)
           )
-        )
+      )
     ))
 
 (defun my-morph-set-known ()
@@ -448,6 +503,7 @@
     (put-text-property beg end 'wtype  wtype)
     (put-text-property beg end 'root root)
     (put-text-property beg end 'surface surface)
+    (put-text-property beg end 'my-morph t)
     ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
                        (my-katakana-to-hiragana (plist-get token 'pronun)))
@@ -519,6 +575,28 @@
     (message "Properties at position %d: %s" pos props)))
 
 
+(defun my-properties-at-point ()
+  (let* ((pos (point))
+         (props (text-properties-at pos)))
+    (if (plist-get props 'my-morph t)
+        props
+      nil
+        )))
+  
+  
+(defun my-mark-as-ignored-at-point ()
+  (interactive)
+  (let* (
+         (props (my-properties-at-point)))
+    (if props
+        (my-morph-new-status "ignore")
+        )
+    )
+  )
+
+
+
+
 (defun my-process-filter (output)
   "Process OUTPUT from mecab one line at a time using jp-process."
   (message "Starting [%s]" (my-until-eoln output))
@@ -531,6 +609,7 @@
      (buffer-substring (point-min) (point-max))
      )
     ))
+
 
 (defun my-mecab-process-line (line)
   "maps a mecab output line into a pair (surface properties)
