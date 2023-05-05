@@ -157,6 +157,7 @@
 
        )
     (message "finished mecab processng %d tokens" (length jpTokens))
+;    (message "[%s]" jpTokens )
     ;; process the tokens
     (my-process-tokens jpTokens)
     )
@@ -329,6 +330,12 @@
   '((t (:inherit my-face-adjective :bold t)))
   "Face for adjective unknown")
 
+(defface my-face-unknown
+  '((t (:weight bold)))
+    "Face for default unknown text"
+    :group 'basic-faces)
+
+
 
 (defvar my-wtype-table '(
                          ("名詞" . my-face-noun)
@@ -340,15 +347,19 @@
                          ("形容詞" . my-face-adjective)
                          ))
 
-(defvar my-wtype-table-status-unknown'(
+(defvar my-wtype-table-status-unknown '(
                          ("名詞" . my-face-noun-unknown)
                          ("助詞" . my-face-particle-unknown)
                          ("動詞" . my-face-verb-unknown)
                          ("副詞" . my-face-adverb-unknown)
                          ("記号" . my-face-punctuation-unknown)
                          ("助動詞" . my-face-morpheme-unknown)
-                         ("形容詞" . my-face-adjective-unknown)
+                         ("形容詞" . my-face-adjective-unknown)                         
                          ))
+
+(defvar my-font-table-default-status '(
+                                       ("unknown" . my-face-unknown)
+  ))
 
 (defun my-has-japanese-characters-p (str)
   "Check if STR has any Japanese characters."
@@ -365,7 +376,8 @@
   )
 
 (defun my-morph-do-morphs (cmpfun pfun)
-  ""
+  "process each moph(beg end) that satisfies cmpfun(beg)
+and call pfun on it"
   (let ((pos (point-min)))
     (while (setq pos (next-single-property-change pos 'begin))
       (when (funcall cmpfun pos)
@@ -392,11 +404,10 @@
   )
 
 (defun my-morphs-delete-overlays-at-pos (beg end)
-  (message "Found at [%d:%d]" beg end)
+  "delete overlays between beg and end"
   (dolist (overlay (overlays-in beg end))
     (message "deleting... overlay [%s]" overlay)
-    (delete-overlay overlay))
-  
+    (delete-overlay overlay))  
   )
 
 
@@ -419,6 +430,7 @@
 ;;(setq my-status-table (make-hash-table :test 'equal))
 
 (defun my-morph-get-morph-from-props (props)
+  "get the morph from the properties"
   (list
    (plist-get props 'root)
    (plist-get props 'wtype)
@@ -427,18 +439,31 @@
   )
 
 (defun my-morph-get-from-props (props attr)
+  "get specific attribute from props
+this might be redundant, but it is trying to create a layer between
+properties and data
+"
   (plist-get props attr)
   )
 
+(defun my-sort-hash-table (hash-table compare-func)
+  "Return a sorted list of key-value pairs from HASH-TABLE.
+The list is sorted using COMPARE-FUNC to compare elements."
+  (let (pairs)
+    (maphash (lambda (key value)
+               (push (cons key value) pairs))
+             hash-table)
+    (sort pairs compare-func)))
+                                        ;
 
 (defun my-extract-all-morphs ()
-  (interactive)
+  "return a hashtable where the key is the morph, and the value the frequency"
   (let
       (
        (all-morphs (make-hash-table :test 'equal) )
        )
     (my-morph-do-morphs
-     (lambda (beg) (plist-get props 'root))   ;; process all morphs
+     (lambda (beg) (plist-get (text-properties-at beg) 'root))   ;; process all morphs
      (lambda (beg end)  ;; add morphs to the hashtable
        (let*
            (
@@ -452,30 +477,60 @@
                   all-morphs)
          ))
      )
-    (message "[%s]" all-morphs)
-    all-morphs
+;    (message "[%s]" all-morphs)
+    (my-sort-hash-table all-morphs
+                        (lambda (a b) (> (cdr a) (cdr b)))
+                        )
     )
   )
 
-(defun my-report-morphs-status ()
+(defun my-report-all-morphs ()
+  "report the frequency of morphs"
+  (interactive)
   (let (
         (morphs (my-extract-all-morphs))
-        (buffer (create... my-report-buffer))
+;        (buffer (create... my-report-buffer))
         )
-    (with ...
-          (insert "...")
-          )
+    
+    (mapc 
+     (lambda (m) (message "morphs [%s]" m))
+     morphs
+     )
+    (message "total: %d" (length morphs))
     )
   )
 
-(defun my-replace-all-overlays (root wtype surface newstatus)
-                                        ;
-  ;; we need to walk the entire document, because we do not know
+(defun my-update-status-at-position (beg end wtype newstatus)
+  ;;
+  ;;  replace the overlays at the given position
+  ;;  according to the new status
+  ;;
+  (my-morphs-delete-overlays-at-pos beg end)
+  (my-set-overlay-at-pos beg end wtype newstatus)
+)
+
+
+(defun my-replace-all-overlays (props newstatus)
+  ;;                                      ;
+  ;; replace all the overlays of the given morph in all the document
+  ;; according to the new status
   ;; 
+  (my-morph-do-morphs
+   (lambda (beg)      (my-morph-matches-at props beg  )););
+   (lambda (beg end)  (my-update-status-at-position beg
+                                                    end
+                                                    (plist-get props 'wtype)    
+                                                    newstatus
+                                                   )
+     )
+   )
+
   )
 
 (defun my-morph-new-status (props new-status)
-  "mark morph at point as new status"
+  ;; mark the morph in props as new status
+  ;; in the database and in the database
+  ;; 
   (let* (
          (root (plist-get props   'root))
          (wtype (plist-get props  'wtype))
@@ -496,25 +551,36 @@
           ;; and find any instances of the morph
           ;; and change its property
           ;; first remove all overlays in the file
-          (my-replace-all-overlays root wtype surface new-status)
+          (my-replace-all-overlays props new-status)
           )
+      (message "morph (%s %s %s)already has [%s] status" root wtype surface new-status)
       )
     ))
 
-(defun my-morph-set-known ()
-  (interactive)
-  (let* (
-         (pos (point))
-         (props (text-properties-at pos))
-         )
-    (if (and props)
-        (plist-get props 'root)
-        )
-    (my-morph-new-status props "known")
-    )
+;; (defun my-mark-morph-as-known (beg end)
   
-  
-  )
+;;   )
+
+;; (defun my-morph-set-known ()
+;;   (interactive)
+;;   (let* (
+;;          (pos (point))
+;;          (props (text-properties-at pos))
+;;          )
+;;     (if (and props 
+;;              (plist-get props 'root)
+;;              )
+;;         (progn ;
+;;           (my-morph-new-status props "known")
+
+;;           (my-morph-do-morphs
+;;            (lambda (beg) (my-morph-matches-at props beg  )););
+;;            'my-mark-as-known
+;;            )
+;;           )
+;;       )
+;;     )
+;;   )
 
 (defun my-wtype-status-to-face (wtype status)
                                         ;  (and
@@ -523,16 +589,35 @@
         (font-table (my-font-table-to-use status))
         (face (assoc wtype font-table))
         )
-;    (message "inside let [%s]" face)
-    (and face
+    (message "inside let [%s]" face)
+    (message "table used [%s]" font-table)
+    (if face
         (cdr face)
+      (assoc status my-font-table-default-status)
         )
     )   
   )
 
 
+(defun my-set-overlay-at-pos (beg end wtype status)
+  (let (
+        (face (my-wtype-status-to-face wtype status))
+        )
+
+    (if face
+        (let (
+              (ovl (make-overlay beg end));)
+              )
+          (overlay-put ovl 'font-lock-face face)
+          (overlay-put ovl 'my-name t)
+          )
+        )
+    )
+  )
+
+
 (defun my-set-text-prop-token (token)
-;  (message "setting prope [%s]" token)
+  (message "setting prope [%s]" token)
   (let*
       (
        (beg (plist-get token 'begin))
@@ -541,17 +626,9 @@
        (surface (plist-get token 'surface))
        (status (my-morph-status-get root wtype surface))
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
-       (ovl (make-overlay beg end))
-       (face (my-wtype-status-to-face wtype status))
+;       (face (my-wtype-status-to-face wtype status))
        )
-    (overlay-put ovl 'my t)
-    (if face
-        (progn
-;          (message "setting face %s" face)
-          (overlay-put ovl 'font-lock-face face)
-          (overlay-put ovl 'my-name t)
-          )
-      )
+    (my-set-overlay-at-pos beg end wtype status)
     (if status
         (put-text-property beg end 'status status)
       )
@@ -581,9 +658,9 @@
     (dolist (token jpTokens)
       
       (if (my-has-japanese-characters-p (plist-get token 'seen))
-          (if (my-process-wtype-p token)
+;;          (if (my-process-wtype-p token)
               (my-set-text-prop-token token)            
-            )
+;;            )
         
         )    
       )
@@ -635,21 +712,41 @@
 (defun my-properties-at-point ()
   (let* ((pos (point))
          (props (text-properties-at pos)))
-    (if (plist-get props 'my-morph t)
+    (if (plist-get props 'my-morph)
         props
       nil
         )))
   
   
-(defun my-mark-as-ignored-at-point ()
+(defun my-mark-at-point-as-ignored ()
   (interactive)
   (let* (
          (props (my-properties-at-point)))
     (if props
-        (my-morph-new-status "ignore")
+        (my-morph-new-status props "ignore")
         )
     )
   )
+
+(defun my-mark-at-point-as-known ()
+  (interactive)
+  (let* (
+         (props (my-properties-at-point)))
+    (if props
+        (my-morph-new-status props "known")
+      )
+    )
+  )
+
+(defun my-mark-at-point-as-unknown ()
+(interactive)
+(let* (
+       (props (my-properties-at-point)))
+  (if props
+      (my-morph-new-status props "unknown")
+    )
+  )
+)
 
 
 

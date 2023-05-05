@@ -145,15 +145,27 @@ All this seems to indicate that the real bottleneck is running mecab.
 
 * TO DOs
 
-- [ ] see if we can reuse overlays. but seems to be lower priority
 - [X] slowest part is looking up known words
-- [ ] keeping only one overlay per morph, rather than one per token in the text
 - [ ] updating when a token status is changed
 - [ ] does not work with selected region yet
 - [ ] the mecab process hangs when lines are too long... seems to be an emacs problem
       it also spends a lot of time compared to any other task
 
+
+* Bugs
+
+- [ ] japanese words should be overlayed with status, even if not with other fonts
  
   
 
 
+* pitch accent
+
+https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
+
+#+begin_src python   :exports both
+    txt = e.midashigo1
+    strlen = len(txt)
+    acclen = len(e.ac)
+    accent = "0"*(strlen-acclen) + e.ac
+#+end_src
