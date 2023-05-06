@@ -135,41 +135,6 @@
        (char-to-string c)))
    str ""))
 
-(defun my-process-mecab (beg end mecabBuffer)
-  "Process mecab output mecab on region.
-
-  buffer is the process output from mecab
-
-  1. synchronize text and mecab
-  2. Process mecab records
-     for reach line in mecab, create a token
-  3. process each token
-     - add properties and overlay
-
-"
-  (let*
-      (
-       ;; get raw mecab output
-       (output (with-current-buffer mecabBuffer
-                 (progn
-                   (buffer-substring-no-properties (point-min) (point-max)))
-                 )
-               )
-       (message "done processing raw mecab")
-       ;; save mecab ouptut, remove end-of-process message
-       (outputMecab (substring output 0 (string-match my-process-end-st output)))
-       ;; separate tokens
-       (jpTokens (my-process-filter beg end outputMecab))
-       (message "done processing processing tokens")
-
-       )
-    (message "finished mecab processng %d tokens" (length jpTokens))
-;    (message "[%s]" jpTokens )
-    ;; process the tokens
-    (my-process-tokens jpTokens)
-    )
-  )
-
 (defun my-do-region (beg end)
   "jp-ize the buffer
 
@@ -184,28 +149,7 @@
   (if (bufferp my-process-buffer)
       (kill-buffer my-process-buffer))
 
-  (let (
-        
-        (process (or (get-process my-process-name)
-                      (start-process-shell-command my-process-name my-process-buffer my-command)
-                      )                 
-                 )
-        )
-    (progn
-      ;; async input is buffered and we do not want to process
-      ;; incomplete lines. So wait until all output is created and process it
-      (setq process-adaptive-read-buffering t)
-      (message "process starting")
-      (process-send-region process beg end)
-      (message "process sent")
-      (process-send-eof process)
-      (while (accept-process-output process))
-      (message "mecab Done")
-      (my-process-mecab beg end my-process-buffer)
-      (message "finisheb pressing buffer")
-      (kill-buffer my-process-buffer)
-      )      
-    )
+  (my-process-region beg end)
   )
 
 (defun my-do-buffer ()
@@ -620,8 +564,8 @@ The list is sorted using COMPARE-FUNC to compare elements."
         (font-table (my-font-table-to-use status))
         (face (assoc wtype font-table))
         )
-    (message "inside let [%s]" face)
-    (message "table used [%s]" font-table)
+;    (message "inside let [%s]" face)
+;    (message "table used [%s]" font-table)
     (if face
         (cdr face)
       (assoc status my-font-table-default-status)
@@ -648,7 +592,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
 
 
 (defun my-set-text-prop-token (token)
-  (message "setting prope [%s]" token)
+  ;(message "setting prope [%s]" token)
   (let*
       (
        (beg (plist-get token 'begin))
@@ -815,7 +759,7 @@ Properties is a property-list with information about the
                                         
     (if (string-equal "EOS" seen)  ; EOS is a line end
         (setq seen "\n"))
-    (message "Line [%s] surface [%s]" line surface)
+;    (message "Line [%s] surface [%s]" line surface)
     (list 'seen seen 'surface surface 'wtype wtype 'root root 'pronun pronun)
     ))
 )
@@ -877,7 +821,7 @@ Properties is a property-list with information about the
                         (plist-put nextToken 'end   (+ endpos regionOffset -1))
                         (push nextToken output)
                         ;;(add-to-list 'output nextToken t)
-                        (message "    + it matches!! offset %d [%s]" offset nextToken)
+;                        (message "    + it matches!! offset %d [%s]" offset nextToken)
                         (setq lst (cdr lst))
                         (setq offset (+ offset nextLen))
                         ))
@@ -900,7 +844,7 @@ Properties is a property-list with information about the
                           (error "something went wrong. Unable to match mecab to text") 
                           )
                       (setq offset (+ offset skip))
-                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
+;                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
                       )))
                 )
            
@@ -911,6 +855,98 @@ Properties is a property-list with information about the
       ;; but if there is text left, we dont' care for it
       (nreverse output)
       )))
+
+(defun my-process-mecab (beg end mecabBuffer)
+  "Process mecab output mecab on region.
+
+  buffer is the process output from mecab
+
+  1. synchronize text and mecab
+  2. Process mecab records
+     for reach line in mecab, create a token
+  3. process each token
+     - add properties and overlay
+
+"
+  (let*
+      (
+       ;; get raw mecab output
+       (output (with-current-buffer mecabBuffer
+                 (progn
+                   (buffer-substring-no-properties (point-min) (point-max)))
+                 )
+               )
+       (message "done processing raw mecab")
+       ;; save mecab ouptut, remove end-of-process message
+       (outputMecab (substring output 0 (string-match my-process-end-st output)))
+       ;; separate tokens
+       (jpTokens (my-process-filter beg end outputMecab))
+       (message "done processing processing tokens")
+
+       )
+    (message "finished mecab processng %d tokens" (length jpTokens))
+;    (message "[%s]" jpTokens )
+    ;; process the tokens
+    (my-process-tokens jpTokens)
+    )
+  )
+
+(defun my-process-region (beg end)
+  (let (
+        
+        (process (or (get-process my-process-name)
+                     (start-process-shell-command my-process-name my-process-buffer my-command)
+                     )                 
+                 )
+        )
+    (progn
+      ;; async input is buffered and we do not want to process
+      ;; incomplete lines. So wait until all output is created and process it
+      (setq process-adaptive-read-buffering t)
+      (message "process starting")
+      (process-send-region process beg end)
+      (message "process sent")
+      (process-send-eof process)
+      (while (accept-process-output process))
+      (message "mecab Done")
+      (my-process-mecab beg end my-process-buffer)
+      (message "finisheb pressing buffer")
+      (kill-buffer my-process-buffer)
+      )      
+    )
+  )
+
+(defun my-execute (command input)
+  ;; execute command (list of strings)
+  ;; return the output of the command
+
+  (let (
+        (my-output "")
+        (process (make-process
+                  :name "my-process"
+                  :buffer nil
+                  :command command
+                  :filter 'my-filter
+                  :sentinel 'my-sentinel
+                  )
+                 )
+        )
+    (defun my-filter (proc string)
+                                        ;(message "from [%s] process [%s] string [%s]" my-output proc string)
+      (setq my-output (concat my-output string))
+      )
+    (defun my-sentinel (process event)
+      (message "Process: [%s] had event [%s]" process event)
+      (message "finally finishing [%s]" my-output)
+      )
+    
+    (process-send-string process input)
+    (process-send-eof process)
+    )
+  )
+
+
+
 
 (defvar my-minor-map (make-sparse-keymap)
   "Keymap used my-minor mode")
