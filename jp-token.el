@@ -135,24 +135,31 @@
        (char-to-string c)))
    str ""))
 
-(defun my-process-mecab ()
-  "retrieves the output from mecab, parses and adds
-  the properties and overlays
-  to the current text based on it"
-  (interactive)
+(defun my-process-mecab (beg end mecabBuffer)
+  "Process mecab output mecab on region.
+
+  buffer is the process output from mecab
+
+  1. synchronize text and mecab
+  2. Process mecab records
+     for reach line in mecab, create a token
+  3. process each token
+     - add properties and overlay
+
+"
   (let*
       (
        ;; get raw mecab output
-       (output (with-current-buffer my-process-buffer
+       (output (with-current-buffer mecabBuffer
                  (progn
                    (buffer-substring-no-properties (point-min) (point-max)))
                  )
                )
-       ;; remove end marker
        (message "done processing raw mecab")
+       ;; save mecab ouptut, remove end-of-process message
        (outputMecab (substring output 0 (string-match my-process-end-st output)))
        ;; separate tokens
-       (jpTokens (my-process-filter outputMecab))
+       (jpTokens (my-process-filter beg end outputMecab))
        (message "done processing processing tokens")
 
        )
@@ -161,21 +168,21 @@
     ;; process the tokens
     (my-process-tokens jpTokens)
     )
-  
   )
 
-(defun my-do-buffer ()
-  "Run a command on the current buffer asynchronously,
-   reusing an existing shell command process buffer if one exists.
-   When it ends, process the output."
-  (interactive)
+(defun my-do-region (beg end)
+  "jp-ize the buffer
+
+     1. Run mecab command on the current buffer asynchronously,
+     2. Process the output.
+     3. kill output buffer
+"
+  (interactive "r")
+
+  (my-remove-props-and-overlays beg end)
   ;; kill the buffer if it exists
   (if (bufferp my-process-buffer)
       (kill-buffer my-process-buffer))
-  ;; create buffer and remove undo
-;;    (with-current-buffer (get-buffer-create my-process-buffer)
-;;    (setq buffer-undo-list nil);
-;;    )
 
   (let (
         
@@ -189,17 +196,23 @@
       ;; incomplete lines. So wait until all output is created and process it
       (setq process-adaptive-read-buffering t)
       (message "process starting")
-      (process-send-region process (point-min) (point-max))
+      (process-send-region process beg end)
       (message "process sent")
       (process-send-eof process)
       (while (accept-process-output process))
       (message "mecab Done")
-      (my-process-mecab)
+      (my-process-mecab beg end my-process-buffer)
       (message "finisheb pressing buffer")
       (kill-buffer my-process-buffer)
       )      
     )
   )
+
+(defun my-do-buffer ()
+  (interactive)
+  (my-do-region (point-min) (point-max))
+  )
+
 
 (defun my-pos ()
   (interactive)
@@ -425,6 +438,24 @@ and call pfun on it"
     'my-morphs-delete-overlays-at-pos
     )
   )
+
+(defun my-remove-props-and-overlays (beg end)
+  (interactive "r")
+  ;; find all props and remove them
+  ;; find all overlays and remove them
+  (with-silent-modifications
+   (let ((inhibit-read-only t)) ; allow modifying read-only text
+    (remove-text-properties beg end '(root nil
+                                           wtype nil
+                                           surface nil
+                                           pronun  nil
+                                           begin   nil
+                                           my-morph nil
+                                           end     nil
+                                           status  nil
+                                           ))
+    (remove-overlays beg end 'my-name t)
+  )))
 
 (setq my-test-all-morphs (make-hash-table :test 'equal));(list))
 ;;(setq my-status-table (make-hash-table :test 'equal))
@@ -751,7 +782,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
 
 
 
-(defun my-process-filter (output)
+(defun my-process-filter (beg end output)
   "Process OUTPUT from mecab one line at a time using jp-process."
   (message "Starting [%s]" (my-until-eoln output))
   (let* (
@@ -760,7 +791,8 @@ The list is sorted using COMPARE-FUNC to compare elements."
          )
     (my-sync-list-to-st
      tokens
-     (buffer-substring (point-min) (point-max))
+     (buffer-substring beg end)
+     beg
      )
     ))
 
@@ -783,7 +815,7 @@ Properties is a property-list with information about the
                                         
     (if (string-equal "EOS" seen)  ; EOS is a line end
         (setq seen "\n"))
-;    (message "Line [%s] surface [%s] [%d]" line surface (string-width surface))
+    (message "Line [%s] surface [%s]" line surface)
     (list 'seen seen 'surface surface 'wtype wtype 'root root 'pronun pronun)
     ))
 )
@@ -803,7 +835,7 @@ Properties is a property-list with information about the
                                            accumulative-length (car pair) (nth 1 pair))))))
     running-lengths))
 
-(defun my-sync-list-to-st (lst st)
+(defun my-sync-list-to-st (lst st regionOffset)
   "Unfortunately mecab does not output all characters (e.g. spaces). This means
   we need to find out where in the text each token is.
 
@@ -841,12 +873,11 @@ Properties is a property-list with information about the
                           ) 
                       (progn
                                         ;                    (setq st (substring st nextLen))
-                        (plist-put nextToken 'begin (+ offset 1))
-                        (plist-put nextToken 'end   endpos)
-;                        (setq position (+ endpos 1))
+                        (plist-put nextToken 'begin (+ offset regionOffset))
+                        (plist-put nextToken 'end   (+ endpos regionOffset -1))
                         (push nextToken output)
                         ;;(add-to-list 'output nextToken t)
- ;                       (message "    + it matches!! offset %d [%s]" offset nextToken)
+                        (message "    + it matches!! offset %d [%s]" offset nextToken)
                         (setq lst (cdr lst))
                         (setq offset (+ offset nextLen))
                         ))
@@ -869,7 +900,7 @@ Properties is a property-list with information about the
                           (error "something went wrong. Unable to match mecab to text") 
                           )
                       (setq offset (+ offset skip))
-;                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
+                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
                       )))
                 )
            
