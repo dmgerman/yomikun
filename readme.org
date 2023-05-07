@@ -13,24 +13,21 @@
 * This is work in progress.
 
 - [X] tokenize and colour tokens by type
-- [X] typeset the text according to learning status (still to be completed)
+- [-] typeset the text according to learning status (still to be completed)
   - [X] known status saved in a SQLite database
   - [ ] ability to change status interactively
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
-- [ ] add info for N-levels
+- [-] add info for N-levels (
 - [ ] make it async
 - [ ] put all together into a minor local mode
-- [ ] operate in regions    
+- [X] operate in regions    
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
-- [ ] rename all the variables
+- [ ] rename everything to something more meaningful
 - [ ] remove unnecessary code
 - [ ] reorganize code  
-
-* dictionary
-
-Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
+- [ ] keep track of known kanji?
 
 * Nomenclature
 
@@ -45,6 +42,102 @@ Support via an external dictionary. Most likely [[https://github.com/melissaboik
   - ignore: we don't care for it, i.e. names, or interjections)
   - known: the surface of the word (i.e. seen version of the root, eg. たベル vs 食べる) is known
 - if the morph is not in the db, it means it is unknown
+
+* how to use
+
+** requirements
+
+*** mecab
+
+This module relies primarily on mecab to parse japanese. In particular it uses mecab unidict.
+
+You will have to have a running installation of mecab. Make sure you can run mecab. For example, make sure you get the following output
+(replace /Users/dmg/bin/osx/m-mecab.sh  with the path to mecab in your installation). Note the number of columns.
+
+#+begin_src bash :results verbatim
+echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh 
+#+end_src
+
+#+RESULTS:
+#+begin_example
+猫	名詞,普通名詞,一般,*,*,*,ネコ,猫,猫,ネコ,猫,ネコ,和,*,*,*,*,*,*,体,ネコ,ネコ,ネコ,ネコ,1,C4,*,7918141678166528,28806
+が	助詞,格助詞,*,*,*,*,ガ,が,が,ガ,が,ガ,和,*,*,*,*,*,*,格助,ガ,ガ,ガ,ガ,*,"動詞%F2@0,名詞%F1",*,2168520431510016,7889
+大好き	形状詞,一般,*,*,*,*,ダイスキ,大好き,大好き,ダイスキ,大好き,ダイスキ,混,*,*,*,*,*,*,相,ダイスキ,ダイスキ,ダイスキ,ダイスキ,1,C1,*,6326873407758848,23017
+です	助動詞,*,*,*,助動詞-デス,終止形-一般,デス,です,です,デス,です,デス,和,*,*,*,*,*,*,助動,デス,デス,デス,デス,*,"形容詞%F2@-1,動詞%F2@0,名詞%F2@1",*,7051468750332587,25653
+。	補助記号,句点,*,*,*,*,*,。,。,*,。,*,記号,*,*,*,*,*,*,補助,*,*,*,*,*,*,*,6880571302400,25
+EOS
+#+end_example
+
+
+*** emacs' emacsql module installed
+
+You need to install [[https://github.com/magit/emacsql]].
+
+
+** installation
+
+- make sure mecab is installed and can be run from the command line. See above
+- copy one of the status databases from [[./dbs/]] into your preferred location. The default location is ~/jp-status.db
+
+
+#+begin_src emacs-lisp   :exports both
+(require 'jp-token)
+
+;; replace with your path to mecab
+(setq my-command  "/Users/dmg/bin/osx/m-mecab.sh")
+
+;; replace with your preferred name and location. If the database does not exist, it will be created.
+(setq my-status-db-file "~/jp-status.db")
+
+#+end_src
+
+you will now have two commands available:
+
+#+begin_src emacs-lisp   :exports both
+my-do-buffer
+#+end_src
+
+this function will process the entire buffer.
+
+and 
+
+#+begin_src emacs-lisp   :exports both
+my-do-region
+#+end_src
+
+which will do only the current region.
+
+Both commands can be run on text that has been already processed.
+
+
+* Limitations
+
+- work in progress.
+- Tested only in macos but it should work without problems in linux
+- Processing of large text can take few seconds. For example Alice in Wonderland takes 8 seconds to process on an M1 mini.
+ 
+
+* status database
+
+The status database is a sqlite database created and managed by emacsql. This means that all attributes are surrounded by double quotes.
+
+The schema is fairly simple:
+
+| attribute | description                              |
+|-----------+------------------------------------------|
+| morph     | root of the morph                        |
+| mtype     | type                                     |
+| surface   | the root as processed                    |
+| status    | one of several: known, unknown, learning |
+| date      | date the tuple was added to the relation |
+
+The primary key is (morph, mtype, surface)
+
+there are databases with different JLPT levels at [[./dbs/]]
+
+* dictionary
+
+Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
 
 * mecab parsing
 
@@ -143,23 +236,12 @@ Processing large amounts of text is slow. In my tests, emacs can do Alice in Won
 
 All this seems to indicate that the real bottleneck is running mecab.
 
-* TO DOs
-
-- [X] slowest part is looking up known words
-- [ ] updating when a token status is changed
-- [ ] does not work with selected region yet
-- [ ] the mecab process hangs when lines are too long... seems to be an emacs problem
-      it also spends a lot of time compared to any other task
-
-
-* Bugs
-
-- [ ] japanese words should be overlayed with status, even if not with other fonts
- 
   
 
 
 * pitch accent
+
+to be done...
 
 https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
 

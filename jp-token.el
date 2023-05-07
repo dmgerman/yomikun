@@ -19,7 +19,7 @@
 
 (defvar my-process-buffer "*jp-process*" "Name of buffer for shell command process")
 
-(defvar my-report-buffer "*jp-report*" "Name of buffer for shell command process")
+(defvar my-report-buffer "*jp-report*" "Name of buffer for report")
 
 (defvar my-dict-db nil) ;; instance of the quick dictionary db
 (defvar my-status-db nil) ;; instance of the status db
