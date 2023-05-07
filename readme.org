@@ -15,10 +15,10 @@
 - [X] tokenize and colour tokens by type
 - [-] typeset the text according to learning status (still to be completed)
   - [X] known status saved in a SQLite database
-  - [ ] ability to change status interactively
+  - [-] ability to change status interactively
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
-- [-] add info for N-levels (
+- [-] add info for N-levels (N5, N4 and N3)
 - [ ] make it async
 - [ ] put all together into a minor local mode
 - [X] operate in regions    
@@ -54,7 +54,7 @@ This module relies primarily on mecab to parse japanese. In particular it uses m
 You will have to have a running installation of mecab. Make sure you can run mecab. For example, make sure you get the following output
 (replace /Users/dmg/bin/osx/m-mecab.sh  with the path to mecab in your installation). Note the number of columns.
 
-#+begin_src bash :results verbatim
+#+begin_src bash :results verbatim :exports both
 echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh 
 #+end_src
 
