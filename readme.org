@@ -1,3 +1,17 @@
+* Table of contents :toc:
+- [[#mode-for-reading-japanese][mode for reading japanese]]
+- [[#this-is-work-in-progress][This is work in progress.]]
+- [[#nomenclature][Nomenclature]]
+- [[#how-to-use][how to use]]
+  - [[#requirements][requirements]]
+  - [[#installation][installation]]
+- [[#limitations][Limitations]]
+- [[#status-database][status database]]
+- [[#dictionary][dictionary]]
+- [[#mecab-parsing][mecab parsing]]
+- [[#speed][speed]]
+- [[#pitch-accent][pitch accent]]
+
 * mode for reading japanese
 
 - tokenize Japanese text
