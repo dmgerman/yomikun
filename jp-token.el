@@ -21,7 +21,7 @@
 
 (defvar my-report-buffer "*jp-report*" "Name of buffer for shell command process")
 
-(defvar my-status-db nil) ;; instance of the db
+(defvar my-dict-db nil) ;; instance of the db
 
 (defun my-db-open ()
   (interactive)
@@ -33,7 +33,28 @@
      (setq my-status-db (emacsql-sqlite my-status-db-file)))
     )
 
-(defun my-db-close()
+
+(defvar my-status-db-file "~/jp-status.db")
+
+(defvar my-dict-db nil) ;; instance of the db
+(defvar my-dict-db-file nil) ;; instance of the db
+(setq my-dict-db-file "~/dictionary.db")
+
+(defun my-db-dict-open ()
+  (interactive)
+  (when (not (file-exists-p my-dict-db-file))
+    (signal 'file-error (format "the dictionary file does not exist [%s]" my-dict-db-file))
+    )
+  ;; only open it if it is not open
+  (when (not my-dict-db)
+    (setq my-dict-db (emacsql-sqlite my-dict-db-file)))
+  )
+
+(defun my-db-dict-close ()
+  (emacsql-close my-dict-db)
+  )
+
+(defun my-db-status-close()
   (emacsql-close my-status-db)
   )
 
@@ -51,6 +72,31 @@
   (emacsql my-status-db [:create-table words ([morph mtype surface status date]
                                               (:primary-key [morph mtype surface])
                                               )])
+  )
+
+(defun my-db-dict-def (root pronun)
+  (emacsql my-dict-db [:select [def pos rank]
+                                 :from dict
+                                 :where (and (= root $s1) (= pronun $s2) )
+                                 :order-by [(asc rank)]
+                                 ] root pronun) 
+  
+  )
+
+(setq my-dict-table (make-hash-table :test 'equal))
+
+
+(defun my-dict-def (root pronun)
+  (or (gethash (list root pronun) my-dict-table)
+      (let
+          (
+           (def (my-db-dict-def root pronun))
+           )
+        (puthash (list root pronun)
+                 def
+                 my-dict-table)        
+        )        
+      )
   )
 
 
@@ -288,9 +334,11 @@
   "Face for adjective unknown")
 
 (defface my-face-unknown
-  '((t (:weight bold)))
+  '((t (:weight bold
+                :background "cyan"
+                )))
     "Face for default unknown text"
-    :group 'basic-faces)
+    :group 'my)
 
 
 
@@ -891,12 +939,60 @@ Properties is a property-list with information about the
     )
   )
 
+(defun my-create-temp-file-from-string (string)
+  (let ((temp-file (make-temp-file "tmp-string-")))
+    (with-temp-file temp-file
+      (insert string))
+    temp-file))
+
+(defun my-create-simple-buffer (name)
+  (let ((buffer (generate-new-buffer name)))
+    (buffer-disable-undo buffer)
+;    (with-current-buffer buffer
+;      (progn
+;        (setq buffer-undo-list nil)
+;        (mapc (lambda (x) (funcall x -1))
+;              (my-active-minor-modes))
+;
+;        )
+;      )
+    buffer
+    )
+  )
+
 (defun my-process-region (beg end)
+  ;; it run more way faster using an external file as input
+  ;; than piping the text to the process
+  (setq process-adaptive-read-buffering t)
+  (let* (
+         (proc-buffer (my-create-simple-buffer my-process-buffer))
+        (temp-file (my-create-temp-file-from-string (buffer-substring beg end)))
+        (process (start-process my-process-name proc-buffer my-command temp-file)
+                 )
+        )
+    (progn
+      ;; async input is buffered and we do not want to process
+      ;; incomplete lines. So wait until all output is created and process it
+      (message "created temp file [%s]" temp-file)
+      (message "process starting")
+
+;      (process-send-region process beg end)
+      (process-send-eof process)
+      (message "process sent")
+      (while (accept-process-output process))
+      (message "mecab Done")
+      (my-process-mecab beg end proc-buffer)
+      (message "finisheb pressing buffer")
+      (kill-buffer my-process-buffer)
+      (delete-file temp-file)
+      )      
+    )
+  )
+
+(defun my-process-region2 (beg end)
   (let (
         
-        (process (or (get-process my-process-name)
-                     (start-process-shell-command my-process-name my-process-buffer my-command)
-                     )                 
+        (process (start-process-shell-command my-process-name my-process-buffer my-command)
                  )
         )
     (progn
@@ -904,9 +1000,14 @@ Properties is a property-list with information about the
       ;; incomplete lines. So wait until all output is created and process it
       (setq process-adaptive-read-buffering t)
       (message "process starting")
+                                        ;      (with-current-buffer my-process-buffer
+                                        ;        (mapc (lambda (x) (funcall x -1))
+                                        ;              (my-active-minor-modes))
+                                        ;        )
+
       (process-send-region process beg end)
-      (message "process sent")
       (process-send-eof process)
+      (message "process sent")
       (while (accept-process-output process))
       (message "mecab Done")
       (my-process-mecab beg end my-process-buffer)
@@ -916,31 +1017,67 @@ Properties is a property-list with information about the
     )
   )
 
-(defun my-execute (command input)
+
+;; these two functions were supposed to be a way to make it faster... but it ended
+;; being slower. Wayyyyyyyyyyy slower
+;; go figure
+
+(defun my-process-mecab-output (beg end outputMecab)
+  "Process mecab output mecab on region.
+
+  buffer is the process output from mecab
+
+  1. synchronize text and mecab
+  2. Process mecab records
+     for reach line in mecab, create a token
+  3. process each token
+     - add properties and overlay
+
+"
+  (let*
+      (
+       (jpTokens (my-process-filter beg end outputMecab))
+       )
+    (message "finished mecab processng %d tokens" (length jpTokens))
+                                        ;    (message "[%s]" jpTokens )
+    ;; process the tokens
+    (my-process-tokens jpTokens)
+    )
+  )
+
+
+
+(defun my-process-region-test (beg end)
   ;; execute command (list of strings)
   ;; return the output of the command
-
+  (interactive "r")
+  (setq process-adaptive-read-buffering t)
   (let (
-        (my-output "")
+        (mecabOutput "")
+        (output (list))
         (process (make-process
                   :name "my-process"
                   :buffer nil
-                  :command command
+                  :command (list my-command)
                   :filter 'my-filter
                   :sentinel 'my-sentinel
                   )
                  )
         )
     (defun my-filter (proc string)
-                                        ;(message "from [%s] process [%s] string [%s]" my-output proc string)
-      (setq my-output (concat my-output string))
+   ;;(message "from [%s] process [%s] string [%s]" my-output proc string)
+      (setq output (cons string output))
+      
       )
     (defun my-sentinel (process event)
       (message "Process: [%s] had event [%s]" process event)
-      (message "finally finishing [%s]" my-output)
+      (setq mecabOutput
+            (mapconcat 'identity (reverse output) "")
+            )
+      (my-process-mecab-output beg end mecabOutput)
+      (message "finally finishing with length of output [%d] " (length output))
       )
-    
-    (process-send-string process input)
+    (process-send-region process beg end)
     (process-send-eof process)
     )
   )
