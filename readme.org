@@ -14,6 +14,8 @@
 
 * mode for reading japanese
 
+An attempt to bring yomichan/migaku features to emacs.
+
 Features:
 
 - tokenize Japanese text
