@@ -14,10 +14,13 @@
 
 * mode for reading japanese
 
+Features:
+
 - tokenize Japanese text
 - keep track of reading status of words (similar to Anki's [[https://ankiweb.net/shared/info/900801631][morphan]] and [[https://ankiweb.net/shared/info/900801631][Migaku]])
-- overlay information about the definition and pronunciation of current word
-   (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
+- overlay information about the current token
+  - token info
+  - meaning (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]]--to be done)
 
 #+ATTR_HTML: :width 100
 #+ATTR_ORG: :width 800px
