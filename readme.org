@@ -31,13 +31,15 @@ Features:
 
 - [X] tokenize and colour tokens by type
 - [-] typeset the text according to learning status (still to be completed)
-  - [X] known status saved in a SQLite database
+  - [X] known status saved in a SQLite database 
   - [-] ability to change status interactively
+      - mark known and unknown words
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
-- [-] add info for N-levels (N5, N4 and N3)
+- [-] add info for N-levels (N5, N4 and N3 already done)
 - [ ] make it async
-- [ ] put all together into a minor local mode
+- [-] put all together into a minor local mode
+     - minor mode created... needs more commands
 - [X] operate in regions    
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
@@ -68,8 +70,8 @@ Features:
 
 This module relies primarily on mecab to parse japanese. In particular it uses mecab unidict.
 
-You will have to have a running installation of mecab. Make sure you can run mecab. For example, make sure you get the following output
-(replace /Users/dmg/bin/osx/m-mecab.sh  with the path to mecab in your installation). Note the number of columns.
+You must have a running installation of Unidict's mecab.  Make sure you get the following output (replace
+/Users/dmg/bin/osx/m-mecab.sh with the path to mecab in your installation). Note the number of columns. in the output:
 
 #+begin_src bash :results verbatim :exports both
 echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh 
@@ -93,7 +95,8 @@ You need to install [[https://github.com/magit/emacsql]].
 
 ** installation
 
-- make sure mecab is installed and can be run from the command line. See above
+- update the variable my-command with the location of the mecab executable. In my case it is a script that setup the proper resources used by mecab.
+  You can see its contents [[./other/m-mecab.sh][here]].
 - copy one of the status databases from [[./dbs/]] into your preferred location. The default location is ~/jp-status.db
 
 
