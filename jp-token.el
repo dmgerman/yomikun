@@ -21,7 +21,8 @@
 
 (defvar my-report-buffer "*jp-report*" "Name of buffer for shell command process")
 
-(defvar my-dict-db nil) ;; instance of the db
+(defvar my-dict-db nil) ;; instance of the quick dictionary db
+(defvar my-status-db nil) ;; instance of the status db
 
 (defun my-db-open ()
   (interactive)
@@ -108,7 +109,7 @@
   (or (nth 0;
        (emacsql my-status-db [:select [morph mtype status date]
                                       :from words
-                                      :where (and (= morph $s1) (= mtype $s2) (=surface $s3))
+                                      :where (and (= morph $s1) (= mtype $s2) (= surface $s3))
                                       ] root wtype surface) 
        )
       (list nil nil "unknown" nil))
@@ -229,41 +230,57 @@
   )
 
 (defface my-face-unknown
-  '((t (:bold t)))
-  "Face for bold text."
-  :group 'my
-  )
+  '((t (        ;;:weight bold
+                ;:foreground "white"
+                :background "LightYellow2"
+                )))
+  "Face for default unknown text"
+  :group 'my)
 
 (defface my-face-learning
-  '((t (:underline t)))
-  "Face for bold text."
+  '((t (:inherit diff-added)))
+  "Face for learning text."
   :group 'my
   )
   
+;;font-lock-string-face
+;; (defface my-face-noun
+;;   `((((class color) (background light))
+;;      (:foreground  "blue"))
+;;     (((class color) (background dark))
+;;      (:foreground  "blue")))
+;;   "Face for nouns."
+;;   :group 'my)
 (defface my-face-noun
-  `((((class color) (background light))
-     (:foreground  "blue"))
-    (((class color) (background dark))
-     (:foreground  "blue")))
-  "Face for nouns."
-  :group 'my)
-
+  '((t (:inherit font-lock-string-face
+                 )))
+  "Face for noun unknown"
+  :group 'my
+  )
 
 (defface my-face-noun-alt
   `((((class color) (background light))
      (:foreground  "darkblue"))
     (((class color) (background dark))
      (:foreground  "darkblue")))
-  "Face for nouns."
+  "Face for nouns alt."
   :group 'my)
 
+;;font-lock-keyword-face
+;; (defface my-face-verb
+;;   `((((class color) (background light))
+;;      (:foreground  "darkgreen"))
+;;     (((class color) (background dark))
+;;      (:foreground  "red")))
+;;   "Face for verbs."
+;;   :group 'my)
+
 (defface my-face-verb
-  `((((class color) (background light))
-     (:foreground  "darkgreen"))
-    (((class color) (background dark))
-     (:foreground  "red")))
-  "Face for verbs."
-  :group 'my)
+  '((t (:inherit font-lock-keyword-face
+                 )))
+  "Face for verb"
+  :group 'my
+  )
 
 (defface my-face-morpheme
   `((((class color) (background light))
@@ -306,39 +323,33 @@
   :group 'my)
 
 (defface my-face-noun-unknown
-  '((t (:inherit my-face-noun :bold t)))
+  '((t (:inherit ( my-face-noun  my-face-unknown))))
   "Face for noun unknown")
 
 (defface my-face-particle-unknown
-  '((t (:inherit my-face-particle :bold t)))
+  '((t (:inherit ( my-face-particle  my-face-unknown))))
   "Face for particle unknown")
 
 (defface my-face-verb-unknown
-  '((t (:inherit my-face-verb :bold t)))
+  '((t (:inherit ( my-face-verb  my-face-unknown))))
   "Face for verb unknown")
 
 (defface my-face-adverb-unknown
-  '((t (:inherit my-face-adverb :bold t)))
+  '((t (:inherit ( my-face-adverb  my-face-unknown))))
   "Face for Adverb unknown")
 
 (defface my-face-punctuation-unknown
-  '((t (:inherit my-face-punctuation :bold t)))
+  '((t (:inherit ( my-face-punctuation  my-face-unknown))))
   "Face for punctuation unknown")
 
 (defface my-face-morpheme-unknown
-  '((t (:inherit my-face-morpheme :bold t)))
+  '((t (:inherit ( my-face-morpheme  my-face-unknown))))
   "Face for morpheme unknown")
 
 (defface my-face-adjective-unknown
-  '((t (:inherit my-face-adjective :bold t)))
+  '((t (:inherit (my-face-adjective my-face-unknown)                
+                 )))
   "Face for adjective unknown")
-
-(defface my-face-unknown
-  '((t (:weight bold
-                :background "cyan"
-                )))
-    "Face for default unknown text"
-    :group 'my)
 
 
 
@@ -1083,6 +1094,10 @@ Properties is a property-list with information about the
   )
 
 
+(defun my-delete-faces ()
+  "interactive"
+  
+  )
 
 
 (defvar my-minor-map (make-sparse-keymap)
