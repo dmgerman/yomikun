@@ -7,10 +7,10 @@
   - [[#installation][installation]]
 - [[#limitations][Limitations]]
 - [[#status-database][status database]]
-- [[#dictionary][dictionary]]
 - [[#mecab-parsing][mecab parsing]]
 - [[#speed][speed]]
-- [[#pitch-accent][pitch accent]]
+- [[#pitch-accent-to-be-done][pitch accent (to be done)]]
+- [[#dictionary-to-be-done][dictionary (to be done)]]
 
 * mode for reading japanese
 
@@ -157,10 +157,6 @@ The primary key is (morph, mtype, surface)
 
 there are databases with different JLPT levels at [[./dbs/]]
 
-* dictionary
-
-Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
-
 * mecab parsing
 
 From each sentence we obtain the root, the type of word, and the surface (kanji/hiragana version seen). For example:
@@ -243,25 +239,15 @@ echo "美味しい寿司を食べた。おいしくないすしはたべられ�
 
 * speed
 
-Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in 10-15 seconds.
+Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in around 8 seconds in an M1 mini.
 
-
-- as of [2023-04-30 Sun] the profiler reports this processing Alice:
-  - 25% cpu is GC,
-    - 78% of memory is used in the process that runs mecab
-  - 21% is matching the text to mecab output
-  - 10% is processing mecab's output
-  - based on the messages to the minibuffer, ~75% is spent running mecab
 - 4.5k morphs (probably wrong due to breaking lines in wrong place)
 - 98k characters
 - mecab outputs 64k lines
 
-All this seems to indicate that the real bottleneck is running mecab.
+The bottleneck is receiving and processing mecab's output.
 
-  
-
-
-* pitch accent
+* pitch accent (to be done)
 
 to be done...
 
@@ -273,3 +259,8 @@ https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
     acclen = len(e.ac)
     accent = "0"*(strlen-acclen) + e.ac
 #+end_src
+
+* dictionary (to be done)
+
+Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
+
