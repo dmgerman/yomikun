@@ -1179,13 +1179,15 @@ Properties is a property-list with information about the
   "Select the sentence around the point delimited by newline and/or 。."
     (interactive)
     (let ((beg (save-excursion
-                 (backward-char) ;; move one char back to start selection at beginning of sentence
+;;                 (backward-char) ;; move one char back to start selection at beginning of sentence
                  (skip-chars-backward "^。\n") ;; move back to beginning of sentence
                  (point)))
           (end (save-excursion
-                 (forward-char) ;; move one char forward to end selection at end of sentence
+ ;;                (forward-char) ;; move one char forward to end selection at end of sentence
                  (skip-chars-forward "^。\n") ;; move forward to end of sentence
                  (point))))
+      (if (eq (char-after end) ?。)
+          (setq end (+ end 1)))
       (set-mark beg)
       (goto-char end)))
 

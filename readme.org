@@ -32,16 +32,15 @@ Features:
 * This is work in progress.
 
 - [X] tokenize and colour tokens by type
-- [-] typeset the text according to learning status (still to be completed)
+- [X] typeset the text according to learning status (still to be completed)
   - [X] known status saved in a SQLite database 
-  - [-] ability to change status interactively
-      - mark known and unknown words
+  - [X] ability to change status interactively
+    - mark known, unknown, ignored and learning words
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
 - [ ] make it async
-- [-] put all together into a minor local mode
-     - minor mode created... needs more commands
+- [X] local mode
 - [X] operate in regions    
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
@@ -131,6 +130,17 @@ which will do only the current region.
 
 Both commands can be run on text that has been already processed.
 
+At this point you can then enter the my-minor-mode. This mode has the following commands:
+
+| i | mark morph as ignored                |
+| k | mark morph as known                  |
+| l | mark morph as learning               |
+| u | mark morph as unknown                |
+| j | show morph in jisho.org              |
+| k | show kanji in kanjidamage.com        |
+| p | display properties of morph at point |
+| = | mark current sentence                |
+| x | exit minor mode                      |
 
 * Limitations
 
