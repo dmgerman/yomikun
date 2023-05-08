@@ -230,27 +230,24 @@
   )
 
 (defface my-face-unknown
-  '((t (        ;;:weight bold
-                ;:foreground "white"
-                :background "LightYellow2"
+  '((t ( :background "LightYellow2"
                 )))
   "Face for default unknown text"
   :group 'my)
 
 (defface my-face-learning
-  '((t (:inherit diff-added)))
-  "Face for learning text."
-  :group 'my
-  )
-  
-;;font-lock-string-face
-;; (defface my-face-noun
-;;   `((((class color) (background light))
-;;      (:foreground  "blue"))
-;;     (((class color) (background dark))
-;;      (:foreground  "blue")))
-;;   "Face for nouns."
-;;   :group 'my)
+  '((t ( :background "PaleGreen1"
+         )))
+  "Face for default learning text"
+  :group 'my)
+
+(defface my-face-ignore
+  '((t ( :background "gray80"
+         )))
+  "Face for default learning text"
+  :group 'my)
+
+
 (defface my-face-noun
   '((t (:inherit font-lock-string-face
                  )))
@@ -352,6 +349,35 @@
   "Face for adjective unknown")
 
 
+(defface my-face-noun-learning
+  '((t (:inherit ( my-face-noun  my-face-learning))))
+  "Face for noun learning")
+
+(defface my-face-particle-learning
+  '((t (:inherit ( my-face-particle  my-face-learning))))
+  "Face for particle learning")
+
+(defface my-face-verb-learning
+  '((t (:inherit ( my-face-verb  my-face-learning))))
+  "Face for verb learning")
+
+(defface my-face-adverb-learning
+  '((t (:inherit ( my-face-adverb  my-face-learning))))
+  "Face for Adverb learning")
+
+(defface my-face-punctuation-learning
+  '((t (:inherit ( my-face-punctuation  my-face-learning))))
+  "Face for punctuation learning")
+
+(defface my-face-morpheme-learning
+  '((t (:inherit ( my-face-morpheme  my-face-learning))))
+  "Face for morpheme learning")
+
+(defface my-face-adjective-learning
+  '((t (:inherit (my-face-adjective my-face-learning)                
+                 )))
+  "Face for adjective learning")
+
 
 (defvar my-wtype-table '(
                          ("名詞" . my-face-noun)
@@ -370,12 +396,27 @@
                          ("副詞" . my-face-adverb-unknown)
                          ("記号" . my-face-punctuation-unknown)
                          ("助動詞" . my-face-morpheme-unknown)
-                         ("形容詞" . my-face-adjective-unknown)                         
+                         ("形容詞"   . my-face-adjective-unknown)
+                         ("default" . my-face-unknown)
                          ))
+
+
+(defvar my-wtype-table-status-learning'(
+                                        ("名詞" . my-face-noun-learning)
+                                        ("助詞" . my-face-particle-learning)
+                                        ("動詞" . my-face-verb-learning)
+                                        ("副詞" . my-face-adverb-learning)
+                                        ("記号" . my-face-punctuation-learning)
+                                        ("助動詞" . my-face-morpheme-learning)
+                                        ("形容詞" . my-face-adjective-learning)
+                                        ))
+
 
 (defvar my-font-table-default-status '(
                                        ("unknown" . my-face-unknown)
-  ))
+                                       ("learning" . my-face-learning)
+                                       ("ignore" .   my-face-ignore)
+                                       ))
 
 (defun my-has-japanese-characters-p (str)
   "Check if STR has any Japanese characters."
@@ -385,7 +426,8 @@
 
 (defun my-font-table-to-use (status)
   (cond 
-   ((string-equal "known" status)  my-wtype-table)
+   ((string-equal "known" status)     my-wtype-table)
+   ((string-equal "learning" status)  my-wtype-table-status-learning)
    (my-wtype-table-status-unknown)
    )
   
@@ -727,7 +769,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
            (definition (dmg-run-dictionary term))
            )
       (if (> (length definition) 0)
-          (dmg-show-definition definition)
+          (dmg-show-definition term definition)
                                         ; else
         (message (format "Term [%s] not found" term))
         )
@@ -782,8 +824,15 @@ The list is sorted using COMPARE-FUNC to compare elements."
   )
 )
 
-
-
+(defun my-mark-at-point-as-learning ()
+  (interactive)
+  (let* (
+         (props (my-properties-at-point)))
+    (if props
+        (my-morph-new-status props "learning")
+      )
+    )
+  )
 
 (defun my-process-filter (beg end output)
   "Process OUTPUT from mecab one line at a time using jp-process."
@@ -1093,24 +1142,79 @@ Properties is a property-list with information about the
     )
   )
 
+(defun my-visit-site-with-param (base-url parm)
+  (let ((url (format base-url (url-hexify-string parm))))
+    (browse-url url)))
 
-(defun my-delete-faces ()
-  "interactive"
-  
+(defun my-jisho-at-point ()
+  (interactive)
+  (save-excursion
+    (let* (
+           (term (my-extract-term-at-point))
+           )
+      (if term
+          (my-visit-site-with-param "https://jisho.org/search/%s" term)
+          )
+      )
+    )
   )
+
+(defun my-kanji-damage-at-point ()
+  (interactive)
+  (save-excursion
+    (let* (
+           (kanji (char-to-string (char-after)))
+           )
+      ;; todo, check that it is a kanji
+      (if kanji
+          (my-visit-site-with-param "http://www.kanjidamage.com/kanji/search?utf8=✓&q=%s" kanji)
+        )
+      )
+    )
+  )
+
+
+
+(defun my-mark-sentence-at-point ()
+  "Select the sentence around the point delimited by newline and/or 。."
+    (interactive)
+    (let ((beg (save-excursion
+                 (backward-char) ;; move one char back to start selection at beginning of sentence
+                 (skip-chars-backward "^。\n") ;; move back to beginning of sentence
+                 (point)))
+          (end (save-excursion
+                 (forward-char) ;; move one char forward to end selection at end of sentence
+                 (skip-chars-forward "^。\n") ;; move forward to end of sentence
+                 (point))))
+      (set-mark beg)
+      (goto-char end)))
+
 
 
 (defvar my-minor-map (make-sparse-keymap)
   "Keymap used my-minor mode")
 
-(define-key my-minor-map (kbd "i") 'my-prop-at-point)
-(define-key my-minor-map (kbd "d") 'my-define-at-point)
+(defun my-disable-mode ()
+  (interactive)
+  (message "Exiting my-minor-mode")
+  (my-minor-mode -1)
+  )
+
+(define-key my-minor-map (kbd "=") 'my-mark-sentence-at-point)
+(define-key my-minor-map (kbd "p") 'my-prop-at-point)
+(define-key my-minor-map (kbd "i") 'my-mark-at-point-as-ignored)
+(define-key my-minor-map (kbd "k") 'my-mark-at-point-as-known)
+(define-key my-minor-map (kbd "l") 'my-mark-at-point-as-learning)
+(define-key my-minor-map (kbd "RET") 'my-define-at-point)
+(define-key my-minor-map (kbd "j") 'my-jisho-at-point)
+(define-key my-minor-map (kbd "m") 'my-kanji-damage-at-point)
+(define-key my-minor-map (kbd "x") 'my-disable-mode)
 
 (define-minor-mode my-minor-mode
   "my help"
 
   :global nil
-  :lighter   "_jp_"    ; lighter
+  :lighter   "_yk_"    ; lighter
   :keymap my-minor-map             ; keymap
 
   ;; this is where the code goes
