@@ -1,11 +1,26 @@
-;;; -*- lexical-binding: t; -*-
+;; -*- lexical-binding: t; -*-
+;;
+;; Copyright (C) 2023 daniel german (dmg@turingmachine.org)
 
-(require 'popup)
+;; Author: Daniel M German (dmg@turingmachine.org)
+;; Created: May 1, 2023
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;; Version: 0.2
+;; Homepage: https://github.com/dmgerman/yomikun
+;; Package-Requires: ((emacs "27.1") )
+
+;;; Commentary:
+
+
+;;; Code:
+
+
+;;;(require 'popup)
 (require 'pos-tip)
 
 (defvar yk-dict-command "myougiden --human '%s'")
 
-(defvar yk-tango-buffer-name "*tango*")
+(defvar yk-tango-buffer-name "*yk-tango*")
 
 ;; format to log the entry. first is the looked-up term, second definition
 (defvar   yk-tango-entry-format "\n\n\n----Term: %s\n%s")
@@ -75,6 +90,8 @@ typeface to be used and wide/narrow chars width.
 
 
 (defun yk-run-dictionary (term)
+  ;; run dictionary and return its output
+  ;; TODO probably needs error management...
   (if (> (length term) 0)
       (shell-command-to-string (format  yk-dict-command term))
     "no term given"
@@ -82,6 +99,10 @@ typeface to be used and wide/narrow chars width.
 
 
 (defun yk-show-definition (term definition)
+  ;; show the definition:
+  ;;    1. tooltip
+  ;;    2. append to tango buffer
+  
   (yk-tip-show definition)
   (message definition)
   (get-buffer-create yk-tango-buffer-name)
@@ -129,8 +150,11 @@ typeface to be used and wide/narrow chars width.
 
 
 (defun yk-define-at-point ()
-  "show definition of the currently selected word in a tooltip and a message. Keeps a log
-   of searched words in a buffer too. Uses myougiden."
+  "show definition of the morph under point in a tooltip and a message. If the text
+under the point is not a morph, extracts most meaningful option and asks user for
+confirmation.
+
+Keeps a log  of searched words in a transient buffer too"
   (interactive)
   (save-excursion
     (let* (
@@ -139,7 +163,7 @@ typeface to be used and wide/narrow chars width.
            )
       (if (> (length definition) 0)
           (yk-show-definition term definition)
-                                        ; else
+        ;; else
         (message (format "Term [%s] not found" term))
         )
       )

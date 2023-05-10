@@ -12,6 +12,7 @@
 - [[#speed][speed]]
 - [[#pitch-accent-to-be-done][pitch accent (to be done)]]
 - [[#dictionary-to-be-done][dictionary (to be done)]]
+- [[#current-bugstodos][current bugs/todos]]
 
 * mode for reading japanese
 
@@ -94,10 +95,15 @@ EOS
 #+end_example
 
 
-*** emacs' emacsql module installed
+*** emacs libraries
 
-You need to install [[https://github.com/magit/emacsql]].
+These libraries can be installed using melpa
 
+**** emacsql 
+
+[[https://github.com/magit/emacsql]].
+
+**** pos-tip
 
 ** installation
 
@@ -287,3 +293,8 @@ https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
 
 Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
 
+* current bugs/todos
+
+- [ ] ignore fontification is not working
+- [ ] add compounds of 3 kanji to db (eg: 形状詞)
+- [ ] add dictionary lookup for region

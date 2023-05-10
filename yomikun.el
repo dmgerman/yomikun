@@ -1,6 +1,20 @@
 ;;; -*- lexical-binding: t; -*-
+;; -*- lexical-binding: t; -*-
+;;
+;; Copyright (C) 2023 daniel german (dmg@turingmachine.org)
 
 ;; overlay code based on https://github.com/katspaugh/kuromoji.el
+;; used with permission
+
+;; Author: Daniel M German (dmg@turingmachine.org)
+;; Created: May 1, 2023
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;; Version: 0.2
+;; Homepage: https://github.com/dmgerman/yomikun
+;; Package-Requires: ((emacs "27.1") )
+
+
+
 
 
 (require 'emacsql)
