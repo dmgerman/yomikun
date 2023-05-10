@@ -296,5 +296,8 @@ Support via an external dictionary. Most likely [[https://github.com/melissaboik
 * current bugs/todos
 
 - [ ] ignore fontification is not working
-- [ ] add compounds of 3 kanji to db (eg: 形状詞)
+- [ ] compounds
+  - [ ] add compounds of 3 kanji to db (eg: 形状詞)
+  - [ ] fontify compounds
+  - [ ] mark compounds of a region, rather than all buffer
 - [ ] add dictionary lookup for region

@@ -18,6 +18,8 @@
 ;;;(require 'popup)
 (require 'pos-tip)
 
+;; important to wrap %s with single quotes to avoid problems with
+;; shell special characters. Single quotes are removed from term to be search for
 (defvar yk-dict-command "myougiden --human '%s'")
 
 (defvar yk-tango-buffer-name "*yk-tango*")
@@ -92,8 +94,12 @@ typeface to be used and wide/narrow chars width.
 (defun yk-run-dictionary (term)
   ;; run dictionary and return its output
   ;; TODO probably needs error management...
+  
   (if (> (length term) 0)
-      (shell-command-to-string (format  yk-dict-command term))
+      ;; replace single quotes as they would create errors
+      (shell-command-to-string (format  yk-dict-command
+                                        (replace-regexp-in-string "'" "" term)                                        
+                                        ))
     "no term given"
     ))
 
@@ -105,15 +111,11 @@ typeface to be used and wide/narrow chars width.
   
   (yk-tip-show definition)
   (message definition)
-  (get-buffer-create yk-tango-buffer-name)
-  (with-current-buffer  yk-tango-buffer-name
-    (let (
-          (cur-window (get-buffer-window))
-          )
-      (goto-char (point-max))
-      (insert (format yk-tango-entry-format term definition))
-      (set-window-point cur-window (point-max))
-      )
+  (with-current-buffer (get-buffer-create yk-tango-buffer-name)
+    ;; append and update pointer, so it "follows" the lookups
+    (goto-char (point-max))
+    (insert (format yk-tango-entry-format term definition))
+    (set-window-point (get-buffer-window) (point-max))
     ))
 
 (defun yk-extract-word-at-point ()
