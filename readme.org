@@ -8,6 +8,7 @@
 - [[#limitations][Limitations]]
 - [[#status-database][status database]]
 - [[#mecab-parsing][mecab parsing]]
+- [[#compound-terms][compound terms]]
 - [[#speed][speed]]
 - [[#pitch-accent-to-be-done][pitch accent (to be done)]]
 - [[#dictionary-to-be-done][dictionary (to be done)]]
@@ -36,7 +37,7 @@ Features:
   - [X] known status saved in a SQLite database 
   - [X] ability to change status interactively
     - mark known, unknown, ignored and learning words
-- [X] support lookup of compound words (similar to yomichan)
+- [X] support to identify and lookup compound terms (terms created by combining two or more morphs)
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
@@ -149,7 +150,6 @@ At this point you can then enter the my-minor-mode. This mode has the following 
 - Tested only in macos but it should work without problems in linux
 - Processing of large text can take few seconds. For example Alice in Wonderland takes 8 seconds to process on an M1 mini.
  
-
 * status database
 
 The status database is a sqlite database created and managed by emacsql. This means that all attributes are surrounded by double quotes.
@@ -248,6 +248,10 @@ echo "美味しい寿司を食べた。おいしくないすしはたべられ�
 | 形容詞  | 美味しい | おいしい  |
 | 形容詞  | 美味しい | 美味しい  |
 
+* compound terms
+
+to be written...
+
 * speed
 
 Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in around 8 seconds in an M1 mini.
@@ -257,6 +261,9 @@ Processing large amounts of text is slow. In my tests, emacs can do Alice in Won
 - mecab outputs 64k lines
 
 The bottleneck is receiving and processing mecab's output.
+
+Finding compounds is optional. It is a CPU intensive process. Processing of Alice takes 
+approximately 10 seconds.
 
 * pitch accent (to be done)
 

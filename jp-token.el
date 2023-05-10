@@ -1045,7 +1045,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
     )
   )
 
-(defun my-extract-term-at-point ()
+(defun yk-extract-term-at-point ()
     (interactive)
     (let* ((pos (point))
            (props (text-properties-at pos))
@@ -1058,12 +1058,21 @@ The list is sorted using COMPARE-FUNC to compare elements."
                        )
                       ))
            )
-      (if term
-          (message "%s" term)
-        (error "no japanese text under point (perhaps it has not been parsed)")
+      (when (or (not term )
+                (string-equal term ""))
+        (setq term (read-string
+                    "No japanese parsed text under point. Term to search: "
+                    (yk-extract-text)) )
         )
+      (when (or (not term )
+                (string-equal term ""))
+        (error "no term found or provided")          
+        )
+      (message "[%s]" term)
+      term
       )
     )
+    
 
 
 (defun my-define-at-point ()
@@ -1517,7 +1526,8 @@ Properties is a property-list with information about the
 (define-key my-minor-map (kbd "i") 'my-mark-at-point-as-ignored)
 (define-key my-minor-map (kbd "k") 'my-mark-at-point-as-known)
 (define-key my-minor-map (kbd "l") 'my-mark-at-point-as-learning)
-(define-key my-minor-map (kbd "RET") 'my-define-at-point)
+(define-key my-minor-map (kbd "RET") 'yk-define-at-point)
+(define-key my-minor-map (kbd "t") 'yk-extract-term-at-point)
 (define-key my-minor-map (kbd "j") 'my-jisho-at-point)
 (define-key my-minor-map (kbd "m") 'my-kanji-damage-at-point)
 (define-key my-minor-map (kbd "x") 'my-disable-mode)
