@@ -84,6 +84,38 @@
   
   )
 
+(defun my-db-compound-prefix-candidates (st)
+;;  (message "                 .searhing for candidates [%s]" st)
+
+  (when (> (length st) 2)
+    (setq st (concat st "%"))
+;    (message "                  searhing for candidates [%s]" st)
+    (mapcar
+     (lambda (ls) (nth 0 ls))
+     (emacsql my-dict-db [:select [compound]
+                                  :from compounds
+                                  :where (like compound $s1)
+                                  :order-by [(desc (length compound))]
+                                  ] st) 
+     )
+    
+    )
+  )
+
+(defun my-db-compound-exists (st)
+  ;; return t or nil
+;;  (message "                  searching for match [%s]" st)
+
+  (and
+   (emacsql my-dict-db [:select [compound]
+                                :from compounds
+                                :where (= compound $s1)
+                                ] st) 
+   
+   )
+  )
+
+
 (setq my-dict-table (make-hash-table :test 'equal))
 
 
@@ -433,13 +465,196 @@
   
   )
 
+(defun my-morph-do-phrases (cmpfun pfun)
+  "process each phrase (pfun phrase) that satisfies cmpfun at point
+and call pfun on it"
+  (let ((pos (point-min)))
+    (while pos
+      (when (and (get-text-property pos 'my-morph)
+                 (funcall cmpfun pos))
+        (funcall pfun pos (next-single-property-change pos 'my-morph)))
+      (setq pos (next-single-property-change pos 'my-morph))
+      )))
+
+(defun my-morph-do-morphs-in-region (beg end cmpfun pfun)
+  (let ((pos beg))
+    (while (and pos
+            (< pos end))
+;      (message "just  making sure [%s]" pos)
+      (when (and (get-text-property pos 'begin)
+                 (funcall cmpfun pos))
+        (funcall pfun pos (next-single-property-change pos 'begin)))
+      (setq pos (next-single-property-change pos 'begin))
+      )))
+
+(defun my-get-tokens-region (beg end)
+  (let(
+       (lst (list))
+       )
+    (my-morph-do-morphs-in-region beg end
+                                  (lambda (pos) t)
+                                  (lambda (pos end)
+                                    (setq lst (cons
+                                               (list pos
+                                                     (get-text-property pos 'surface)
+                                                     (get-text-property pos 'seen)
+                                                     )
+                                               lst))
+                                    )
+                                  )
+    (nreverse lst)
+    )
+  )
+
+
+(defun my-build-potential-candidates (lst len)
+  ;; lst is a list of pairs (surface seen)
+;  (message "build [%s] [%d]" lst len)
+  (if (>= (length lst) len)
+      ;;
+      (let*  (
+             (prefix  (string-join
+                       ;; use seen  to build prefix
+                       (mapcar (lambda (el) (nth 2 el))
+                               (subseq lst 0 (- len 1)))
+                       ""
+                       )
+                      )
+             (suffix   (nth (- len 1) lst))
+;             (patito (message "suffix [%s]" suffix))
+             (suffixes (list (nth 1 suffix) (nth 2 suffix)))
+             )
+;        (message ">candidate prefix [%d] [%s] [suffixes]" len prefix suffixes)
+                                        ;prefix
+        ;; in case surface is same as root
+;;        (delete-dups suffixes)
+        (mapcar
+         (lambda (el) (concat prefix el))
+         suffixes
+         )
+        )
+    ;; else
+    nil
+      )
+  )
+
+(defun my-find-compound (lst candidates)
+  ;; build strings from longest
+  ;; compare to candidates
+  ;; if match, return
+  ;; ;; return ((begin end) leftover)
+  ;; else
+  ;; ;;; return nil
+  (let* (
+         (n (length lst))
+;;         (longest (longest-string candidates))
+         (max  (apply 'max (mapcar 'length candidates)))
+         (min  (apply 'min (mapcar 'length candidates)))
+         (compound nil)
+        )
+    (while (and
+            (not compound)
+            (> n 1))
+      (let* (
+            (current (my-build-potential-candidates lst n))
+            (cur-surface (nth 0 current))
+            (cur-seen    (nth 1 current))
+            )
+;        (message "           tryin [%s][%s] current [%s]" cur-surface cur-seen current)
+;        (message "      candidates [%s]" candidates)
+        (when (or (and (<= (length cur-surface) max) (>= (length cur-surface) min))
+                  (and (<= (length cur-seen) max) (>= (length cur-seen) min))
+                  )
+          ;; see if one matches
+          (cond
+           ((member cur-seen candidates)
+            (progn
+              (setq compound cur-seen)
+;              (message "Seen Foooooooooooooooooooooo [%s]" compound)
+              )
+            )
+           ((member cur-surface candidates)
+            (progn
+              (setq compound cur-surface)
+;              (message "sur Foooooooooooooooooooooo [%s]" compound)
+              )
+            )
+           )
+          )
+        )
+      (setq n (- n 1))
+      )
+    ;; return value
+    (if compound
+        (progn
+;;          (message "Found compound [%s] length [%d]" compound n)
+          (list compound n)      
+          )
+      nil
+      )
+    
+    )
+  )
+
+(defun my-find-compound-matches (lst)
+  
+  ;; add dummy element to we can do the while loop
+  ;; simplifies logic
+  (setq lst (cons t lst))
+  
+  (while (setq lst (cdr lst))
+      (let* (
+             (candidates        (my-build-potential-candidates lst 2))
+             (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
+             (db-candidates     (my-db-compound-prefix-candidates (nth 1 candidates)))
+             (compound          (and db-candidates
+                                     (my-find-compound lst db-candidates) 
+                                 ))
+             )
+;        (message "---------------matches %s" surface-matches-p)
+;        (message "candidates %s" candidates)
+;        (message "db exist %s" db-candidates)
+        (if compound
+            (message "Found match [%s]" compound)
+          )
+        )
+;      (setq lst (cdr lst))
+   )
+  )
+
+(defun my-find-compounds (beg end)
+;  (message "sentence [%s]" (buffer-substring beg end))
+  (let* (
+         (p-tokens (my-get-tokens-region beg end))
+         (matches (my-find-compound-matches p-tokens))
+        )
+;;      (message "tokens [%s]" p-tokens)
+;;      (message "matches [%s]" matches)
+    t
+      )
+  )
+
+(defun my-list-all-phrases ()
+  (interactive)
+  (message "----------------------")
+  (my-morph-do-phrases
+   (lambda (pos) t)
+   'my-find-compounds
+   )
+  )
+
+
+
 (defun my-morph-do-morphs (cmpfun pfun)
   "process each moph(beg end) that satisfies cmpfun(beg)
 and call pfun on it"
   (let ((pos (point-min)))
-    (while (setq pos (next-single-property-change pos 'begin))
-      (when (funcall cmpfun pos)
-        (funcall pfun pos (next-single-property-change pos 'begin))))))
+    (while pos
+      (when (and (get-text-property pos 'begin)
+             (funcall cmpfun pos))
+        (funcall pfun pos (next-single-property-change pos 'begin)))
+      (setq pos (next-single-property-change pos 'begin))
+      )))
 
 (defun my-morph-matches-at (morphProps pos)
   (let ((pos (point))
@@ -699,6 +914,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
        (beg (plist-get token 'begin))
        (root (plist-get token 'root))
        (wtype (plist-get token 'wtype))
+       (seen (plist-get token 'seen))
        (surface (plist-get token 'surface))
        (status (my-morph-status-get root wtype surface))
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
@@ -714,10 +930,11 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (put-text-property beg end 'root root)
     (put-text-property beg end 'surface surface)
     (put-text-property beg end 'my-morph t)
+    (put-text-property beg end 'seen seen)
+
     ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
-                       (my-katakana-to-hiragana (plist-get token 'pronun)))
-  ))
+                       (my-katakana-to-hiragana (plist-get token 'pronun)))))
 
 
 (defun my-process-wtype-p (token)
@@ -909,6 +1126,7 @@ Properties is a property-list with information about the
         (let* (
                (nextToken (nth 0 lst))
                (next      (plist-get nextToken 'seen))
+               (wtype (plist-get nextToken 'wtype))
                (nextLen   (length next))
                (prefix    (substring st offset (+ nextLen offset)))
                )
@@ -924,16 +1142,17 @@ Properties is a property-list with information about the
                     (let ((endpos (+ offset nextLen ))
                           ) 
                       (progn
-                                        ;                    (setq st (substring st nextLen))
-                        (plist-put nextToken 'begin (+ offset regionOffset))
-                        (plist-put nextToken 'end   (+ endpos regionOffset -1))
-                        (push nextToken output)
+                        ;; ignore punctuation
+                        (when (not (equal wtype "補助記号"))
+                            (plist-put nextToken 'begin (+ offset regionOffset))
+                          (plist-put nextToken 'end   (+ endpos regionOffset -1))
+                          (push nextToken output))
                         ;;(add-to-list 'output nextToken t)
 ;                        (message "    + it matches!! offset %d [%s]" offset nextToken)
                         (setq lst (cdr lst))
                         (setq offset (+ offset nextLen))
                         ))
-                                        ; does not match
+                  ;;; does not match
                   (let* (
                          ;; search from offset for the next token
                          ;; TODO: do not add a new token, it is not needed.
