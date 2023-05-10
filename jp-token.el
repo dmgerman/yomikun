@@ -104,7 +104,8 @@
 
   (when (> (length st) 2)
     (setq st (concat st "%"))
-;    (message "                  searhing for candidates [%s]" st)
+    ;;    (message "                  searhing for candidates [%s]" st)
+    ;; remove the list wrapping each string
     (mapcar
      (lambda (ls) (nth 0 ls))
      (emacsql my-dict-db [:select [compound]
@@ -554,12 +555,10 @@ and call pfun on it"
   )
 
 (defun my-find-compound (lst candidates)
-  ;; build strings from longest
-  ;; compare to candidates
-  ;; if match, return
-  ;; ;; return ((begin end) leftover)
-  ;; else
-  ;; ;;; return nil
+  ;; see what is the longest substring
+  ;; starting from position 0
+  ;; that is found in candidates
+  ;; return nil or (compound number-of-tokens)
   (let* (
          (n (length lst))
 ;;         (longest (longest-string candidates))
@@ -577,20 +576,21 @@ and call pfun on it"
             )
 ;        (message "           tryin [%s][%s] current [%s]" cur-surface cur-seen current)
 ;        (message "      candidates [%s]" candidates)
+;;      avoid unnecessary tests
         (when (or (and (<= (length cur-surface) max) (>= (length cur-surface) min))
-                  (and (<= (length cur-seen) max) (>= (length cur-seen) min))
+                  (and (<= (length cur-seen) max)   (>= (length cur-seen) min))
                   )
           ;; see if one matches
           (cond
            ((member cur-seen candidates)
             (progn
-              (setq compound cur-seen)
+              (setq compound (list cur-seen n))
 ;              (message "Seen Foooooooooooooooooooooo [%s]" compound)
               )
             )
            ((member cur-surface candidates)
             (progn
-              (setq compound cur-surface)
+              (setq compound (list cur-surface n))
 ;              (message "sur Foooooooooooooooooooooo [%s]" compound)
               )
             )
@@ -602,47 +602,69 @@ and call pfun on it"
     ;; return value
     (if compound
         (progn
-          (message "Found compound [%s] length [%d]" compound n)
-          (list compound (+ 1 n))      
+          (message "Found compound [%s] " compound)
           )
-      nil
       )
+    compound
     
     )
   )
 
 (defun my-find-compound-matches (lst)
   
-  ;; add dummy element to we can do the while loop
-  ;; simplifies logic
-  (setq lst (cons t lst))
   
   (let (
+        (len (length lst))
         (not-done t)
+        (offset 0)
+        (result nil)
+        ;; experimenting... remove later if unused
+        (max-cur-compound-len 0)
         )
+    ;; add dummy element to we can do the while loop
+    ;; simplifies logic
+    (setq lst (cons t lst))
     (while (and
             not-done
             (setq lst (cdr lst)) ;; consume the list
-                )
+            
+            )
       (let* (
              (candidates        (my-build-potential-candidates lst 2))
-;             (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
+             ;;            TODO this is slowing down things... but there might be situations
+             ;; where a root ending of a compound of two might match
+             ;; but maybe it is too small to worry about it?
+             ;; but it might affect verbs primarily
+;;           (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
              (db-candidates     (my-db-compound-prefix-candidates (nth 1 candidates)))
              (compound          (and db-candidates
                                      (my-find-compound lst db-candidates) 
-                                 ))
+                                     ))
+             (compound-len (and compound
+                                     (nth 1 compound)))
+             (compound-st      (and compound
+                                     (nth 0 compound)))
              )
 ;        (message "---------------matches %s" surface-matches-p)
 ;        (message "candidates %s" candidates)
 ;        (message "db exist %s" db-candidates)
         (when compound
-;          (message "Found match [%s] [%s] len list [%d]" compound (nth 1 compound) (length lst))
-          (if (= (nth 1 compound) (length lst))
-              ;; no point on continuing
+          (message "Found match offset [%d][%s] [%s] len list [%d]"
+                   offset
+                   compound compound-size (length lst))
+          (message "start [%s] last [%s]" (car lst) (nth (+ compound-len -1) lst))
+          (if (> compound-len max-cur-compound-len)
+              (setq max-cur-compound-len compound-len)
+              )
+          (if (= compound-len (length lst))
+              ;; no point on continuing. we have a match to the end of the list
+              ;; there are other conditions where it is not possible to find matches
+              ;; but it is already complex enough and the gains might be marginal
               (setq not-done nil)
               )
           )
         )
+      (setq offset (+ offset 1))
 ;      (setq lst (cdr lst))
    ))
   )
