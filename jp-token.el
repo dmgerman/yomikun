@@ -290,7 +290,7 @@
   :group 'my)
 
 (defface my-face-ignore
-  '((t ( :background "gray80"
+  '((t ( :background "gray90"
          )))
   "Face for default learning text"
   :group 'my)
@@ -591,7 +591,7 @@ and call pfun on it"
            ((member cur-surface candidates)
             (progn
               (setq compound (list cur-surface n))
-;              (message "sur Foooooooooooooooooooooo [%s]" compound)
+;              (message "Sir Foooooooooooooooooooooo [%s]" compound)
               )
             )
            )
@@ -600,11 +600,9 @@ and call pfun on it"
       (setq n (- n 1))
       )
     ;; return value
-    (if compound
-        (progn
-          (message "Found compound [%s] " compound)
-          )
-      )
+;;    (if compound
+;;        (message "Found compound [%s] " compound)
+;;    )
     compound
     
     )
@@ -649,10 +647,13 @@ and call pfun on it"
 ;        (message "candidates %s" candidates)
 ;        (message "db exist %s" db-candidates)
         (when compound
-          (message "Found match offset [%d][%s] [%s] len list [%d]"
-                   offset
-                   compound compound-size (length lst))
-          (message "start [%s] last [%s]" (car lst) (nth (+ compound-len -1) lst))
+;;          (message "Found match offset [%d][%s] [%s] len list [%d]"
+;;                   offset
+;;                   compound compound-len (length lst))
+;;          (message "start [%s] last [%s]" (car lst) (nth (+ compound-len -1) lst))
+          ;;; save starting point, end point and compound
+          (push (list (car lst) (nth (+ compound-len -1 ) lst)
+                      compound-st) result)
           (if (> compound-len max-cur-compound-len)
               (setq max-cur-compound-len compound-len)
               )
@@ -666,7 +667,31 @@ and call pfun on it"
         )
       (setq offset (+ offset 1))
 ;      (setq lst (cdr lst))
-   ))
+      )
+    
+;    (if result (message "Compounds: [%s]" result))
+    result
+    )
+  )
+
+(defun my-mark-as-compound (lst)
+  ;; this function is probably slower than it can be
+  ;; but it not executed a lot
+  (let*(
+       (beg (car (nth 0 lst)))
+       (end (car (nth 1 lst)))
+       (st  (nth 2 lst))
+       )
+    (message "beg [%s] end [%s] st [%s]" beg end st)
+    (dolist (pos (number-sequence beg (+ 1 end)))
+      (let (
+            (cur-prop (get-text-property pos 'compound))
+            )
+        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
+        (put-text-property pos (+ 1 pos) 'compound (cons st cur-prop ))
+        )
+      )
+    )
   )
 
 (defun my-find-compounds (beg end)
@@ -675,15 +700,22 @@ and call pfun on it"
          (p-tokens (my-get-tokens-region beg end))
          (matches (my-find-compound-matches p-tokens))
         )
-;;      (message "tokens [%s]" p-tokens)
-;;      (message "matches [%s]" matches)
-    t
+    ;;      (message "tokens [%s]" p-tokens)
+    (when matches
+      (remove-text-properties beg end '(compound nil ))
+                              
+      (message "matches [%s]" matches)
+      (mapc
+       'my-mark-as-compound
+       matches
+       )
       )
+    matches
+    )  
   )
 
-(defun my-list-all-phrases ()
+(defun my-do-all-compounds ()
   (interactive)
-  (message "----------------------")
   (my-morph-do-phrases
    (lambda (pos) t)
    'my-find-compounds
