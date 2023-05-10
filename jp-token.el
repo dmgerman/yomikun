@@ -17,9 +17,9 @@
 
 (setq my-max-tokens-to-process 100000)
 
-(defvar my-process-buffer "*jp-process*" "Name of buffer for shell command process")
+(defvar my-process-buffer "*yk-process*" "Name of buffer for shell command process")
 
-(defvar my-report-buffer "*jp-report*" "Name of buffer for report")
+(defvar my-report-buffer "*yk-report*" "Name of buffer for report")
 
 (defvar my-dict-db nil) ;; instance of the quick dictionary db
 (defvar my-status-db nil) ;; instance of the status db
@@ -1073,28 +1073,6 @@ The list is sorted using COMPARE-FUNC to compare elements."
       )
     )
     
-
-
-(defun my-define-at-point ()
-  "show definition of the currently selected word in a tooltip and a message. Keeps a log
-   of searched words in a buffer too. Uses myougiden."
-  (interactive)
-  (save-excursion
-    (let* (
-           (term (my-extract-term-at-point))
-           (definition (dmg-run-dictionary term))
-           )
-      (message "term [%s]" term)
-      (if (> (length definition) 0)
-          (dmg-show-definition term definition)
-                                        ; else
-        (message (format "Term [%s] not found" term))
-        )
-      )
-    )
-  )
-
-
 (defun my-prop-at-point ()
   (interactive)
   (let* ((pos (point))

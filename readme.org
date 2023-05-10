@@ -20,13 +20,16 @@ An attempt to bring yomichan/migaku features to emacs.
 Features:
 
 - tokenize Japanese text
+  - support for compound words
 - keep track of reading status of words (similar to Anki's [[https://ankiweb.net/shared/info/900801631][morphan]] and [[https://ankiweb.net/shared/info/900801631][Migaku]])
 - overlay information about the current token
   - token info
-  - meaning (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]]--to be done)
+  - fontify accordingly
+- dictionary support using [[https://github.com/melissaboiko/myougiden][myougiden]]. This means Eng-Jp , Jp-Eng.
+  - overlaid (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]]--to be done)
+  - keep a buffer with lookups
+- support for getting jumping to reference pages (e.g. [[https://jisho.org][jisho]], [[http://kanjidamage.com][kanjiDamage]])
 
-#+ATTR_HTML: :width 100
-#+ATTR_ORG: :width 800px
 [[./screenshot.png]]
 
 
@@ -38,7 +41,7 @@ Features:
   - [X] ability to change status interactively
     - mark known, unknown, ignored and learning words
 - [X] support to identify and lookup compound terms (terms created by combining two or more morphs)
-- [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
+- [X] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
 - [ ] make it async
