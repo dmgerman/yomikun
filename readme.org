@@ -36,6 +36,7 @@ Features:
   - [X] known status saved in a SQLite database 
   - [X] ability to change status interactively
     - mark known, unknown, ignored and learning words
+- [X] support lookup of compound words (similar to yomichan)
 - [ ] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
