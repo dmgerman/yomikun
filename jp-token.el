@@ -608,6 +608,8 @@ and call pfun on it"
     )
   )
 
+(defvar my-compound-occurences 0)
+
 (defun my-find-compound-matches (lst)
   
   
@@ -677,17 +679,18 @@ and call pfun on it"
 (defun my-mark-as-compound (lst)
   ;; this function is probably slower than it can be
   ;; but it not executed a lot
+  (setq my-compound-occurences (+ 1 my-compound-occurences))
   (let*(
        (beg (car (nth 0 lst)))
        (end (car (nth 1 lst)))
        (st  (nth 2 lst))
        )
-    (message "beg [%s] end [%s] st [%s]" beg end st)
+;    (message "beg [%s] end [%s] st [%s]" beg end st)
     (dolist (pos (number-sequence beg (+ 1 end)))
       (let (
             (cur-prop (get-text-property pos 'compound))
             )
-        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
+;        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
         (put-text-property pos (+ 1 pos) 'compound (cons st cur-prop ))
         )
       )
@@ -704,7 +707,7 @@ and call pfun on it"
     (when matches
       (remove-text-properties beg end '(compound nil ))
                               
-      (message "matches [%s]" matches)
+;      (message "matches [%s]" matches)
       (mapc
        'my-mark-as-compound
        matches
@@ -716,10 +719,13 @@ and call pfun on it"
 
 (defun my-do-all-compounds ()
   (interactive)
-  (my-morph-do-phrases
-   (lambda (pos) t)
-   'my-find-compounds
-   )
+  (setq my-compound-occurences 0)
+  (with-silent-modifications 
+    (my-morph-do-phrases
+     (lambda (pos) t)
+     'my-find-compounds
+     ))
+  (message "Done. Found [%s] compounds" my-compound-occurences)
   )
 
 
