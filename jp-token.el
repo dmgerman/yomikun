@@ -5,78 +5,83 @@
 
 (require 'emacsql)
 
-(defvar my-command "echo" "Shell command to run on buffer contents")
-(defvar my-process-name "jp-process")
+(defvar yk-mecab-command "echo" "Shell command to run on buffer contents")
+(defvar yk-process-name "jp-process")
 
-(defvar my-process-end-st "\nProcess")
-(defvar my-status-db-file "~/jp-status.db")
+;; string used by emacs to delimit end of process
+(defvar yk-process-end-st "\nProcess")
 
-(setq my-command  "/Users/dmg/bin/osx/m-mecab.sh")
 
-(defvar my-max-tokens-to-process 10000)
+(defvar yk-db-status-file "~/yk-status.db")
+(defvar yk-db-dict-file nil) 
 
-(setq my-max-tokens-to-process 100000)
+(defvar yk-max-tokens-to-process 10000)
 
-(defvar my-process-buffer "*yk-process*" "Name of buffer for shell command process")
 
-(defvar my-report-buffer "*yk-report*" "Name of buffer for report")
+(defvar yk-process-buffer "*yk-process*" "Name of buffer for shell command process")
+(defvar yk-report-buffer "*yk-report*" "Name of buffer for report")
 
-(defvar my-dict-db nil) ;; instance of the quick dictionary db
-(defvar my-status-db nil) ;; instance of the status db
 
-(defun my-db-open ()
+(defvar yk-date-format "%Y-%m-%d %H:%M" "Format to use when logging to the status database")
+
+(defvar yk-db-dict nil)   ;; instance of the quick dictionary db
+(defvar yk-db-status nil) ;; instance of the status db
+
+;; TODO move my own configuration somewhere else
+
+(setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
+(setq yk-max-tokens-to-process 100000)
+(setq yk-db-status-file "~/jp-status.db")
+(setq yk-db-dict-file "~/dictionary.db")
+
+
+(defun yk-db-status-open ()
   (interactive)
-    (when (not (file-exists-p my-status-db-file))
-      (signal 'file-error (format "the file does not exist [%s]" my-status-db-file))
+    (when (not (file-exists-p yk-db-status-file))
+      (signal 'file-error (format "the file does not exist [%s]" yk-db-status-file))
       )
     ;; only open it if it is not open
-    (when (not my-status-db)
-     (setq my-status-db (emacsql-sqlite my-status-db-file)))
+    (when (not yk-db-status)
+     (setq yk-db-status (emacsql-sqlite yk-db-status-file)))
     )
 
-
-(defvar my-status-db-file "~/jp-status.db")
-
-(defvar my-dict-db nil) ;; instance of the db
-(defvar my-dict-db-file nil) ;; instance of the db
-(setq my-dict-db-file "~/dictionary.db")
-
-(defun my-db-dict-open ()
+(defun yk-db-dict-open ()
   (interactive)
-  (when (not (file-exists-p my-dict-db-file))
-    (signal 'file-error (format "the dictionary file does not exist [%s]" my-dict-db-file))
+  (when (not (file-exists-p yk-db-dict-file))
+    (signal 'file-error (format "the dictionary file does not exist [%s]" yk-db-dict-file))
     )
   ;; only open it if it is not open
-  (when (not my-dict-db)
-    (setq my-dict-db (emacsql-sqlite my-dict-db-file)))
+  (when (not yk-db-dict)
+    (setq yk-db-dict (emacsql-sqlite yk-db-dict-file)))
   )
 
-(defun my-db-dict-close ()
-  (emacsql-close my-dict-db)
+(defun yk-db-dict-close ()
+  (emacsql-close yk-db-dict)
   )
 
-(defun my-db-status-close()
-  (emacsql-close my-status-db)
+(defun yk-db-status-close()
+  (emacsql-close yk-db-status)
   )
 
-(defun my-get-time-date ()
-  (format-time-string "%Y-%m-%d %H:%M" (current-time))
-  
+(defun yk-get-time-date ()
+  (format-time-string yk-date-format (current-time))
   )
 
-(defun my-db-create ()
+(defun yk-db-status-create ()
+  "Create status database"
   (interactive)
-  (when (file-exists-p my-status-db-file) 
-    (signal 'file-error (format "the file already exist [%s]" my-status-db-file))
+  (message "creating status database at [%s]" yk-db-status-file)
+  (when (file-exists-p yk-db-status-file) 
+    (signal 'file-error (format "the file already exist [%s]" yk-db-status-file))
     )
-  (setq my-status-db (emacsql-sqlite my-status-db-file))
-  (emacsql my-status-db [:create-table words ([morph mtype surface status date]
+  (setq yk-db-status (emacsql-sqlite yk-db-status-file))
+  (emacsql yk-db-status [:create-table words ([morph mtype surface status date]
                                               (:primary-key [morph mtype surface])
                                               )])
   )
 
-(defun my-db-dict-def (root pronun)
-  (emacsql my-dict-db [:select [def pos rank]
+(defun yk-db-dict-def (root pronun)
+  (emacsql yk-db-dict [:select [def pos rank]
                                  :from dict
                                  :where (and (= root $s1) (= pronun $s2) )
                                  :order-by [(asc rank)]
@@ -84,31 +89,33 @@
   
   )
 
-(setq my-compound-candidates-table (make-hash-table :test 'equal))
+;; this is a memoization of the compounds queries
+;; it does not seem to make an impact worth the memory it uses
+;; currently unused
+(setq yk-compound-candidates-table (make-hash-table :test 'equal))
 
-(defun my-compound-prefix-candidates (st)
-  (or (gethash st my-compound-candidates-table)
+(defun yk-compound-prefix-candidates (st)
+  (or (gethash st yk-compound-candidates-table)
       (let
           (
-           (comps (my-db-compound-prefix-candidates st))
+           (comps (yk-db-compound-prefix-candidates st))
            )
         (puthash st
                  comps
-                 my-compound-candidates-table)        
+                 yk-compound-candidates-table)        
         )        
       )
   )
 
-(defun my-db-compound-prefix-candidates (st)
-;;  (message "                 .searhing for candidates [%s]" st)
-
+(defun yk-db-compound-prefix-candidates (st)
+  "Return a list of compounds that have as prefix the string st"
   (when (> (length st) 2)
     (setq st (concat st "%"))
     ;;    (message "                  searhing for candidates [%s]" st)
     ;; remove the list wrapping each string
     (mapcar
      (lambda (ls) (nth 0 ls))
-     (emacsql my-dict-db [:select [compound]
+     (emacsql yk-db-dict [:select [compound]
                                   :from compounds
                                   :where (like compound $s1)
                                   :order-by [(desc (length compound))]
@@ -118,12 +125,10 @@
     )
   )
 
-(defun my-db-compound-exists (st)
-  ;; return t or nil
-;;  (message "                  searching for match [%s]" st)
-
+(defun yk-db-compound-exists (st)
+  "Check if a given compound exists"
   (and
-   (emacsql my-dict-db [:select [compound]
+   (emacsql yk-db-dict [:select [compound]
                                 :from compounds
                                 :where (= compound $s1)
                                 ] st) 
@@ -132,30 +137,34 @@
   )
 
 
-(setq my-dict-table (make-hash-table :test 'equal))
+;; hash used for memoization of dictionary lookups
+;; currently unused
+(setq yk-dict-table (make-hash-table :test 'equal))
 
-
-(defun my-dict-def (root pronun)
-  (or (gethash (list root pronun) my-dict-table)
+(defun yk-dict-def (root pronun)
+  (or (gethash (list root pronun) yk-dict-table)
       (let
           (
-           (def (my-db-dict-def root pronun))
+           (def (yk-db-dict-def root pronun))
            )
         (puthash (list root pronun)
                  def
-                 my-dict-table)        
+                 yk-dict-table)        
         )        
       )
   )
 
-
-(defun my-db-morph-status-get (root wtype surface)
+(defun yk-db-morph-status-get (root wtype surface)
+  "return the tuple that matches the given root wtype and
+surface. The three attribuetes are the primary key, so
+return match as a list or nil if not found
+"
   ;; since it is a singleton, remove wrapping list
   ;; nth returns nil if the list is empty
   ;;  (message "get db [%s %s %s]" root wtype surface)
   
   (or (nth 0;
-       (emacsql my-status-db [:select [morph mtype status date]
+       (emacsql yk-db-status [:select [morph mtype status date]
                                       :from words
                                       :where (and (= morph $s1) (= mtype $s2) (= surface $s3))
                                       ] root wtype surface) 
@@ -163,66 +172,73 @@
       (list nil nil "unknown" nil))
   )
 
-(defun my-db-morph-status-delete (root wtype surface)
-  (emacsql my-status-db [:delete 
+(defun yk-db-morph-status-delete (root wtype surface)
+  "delete given morph, if it exists"
+  (emacsql yk-db-status [:delete 
                             :from words
                             :where (and (= morph $s1) (= mtype $s2) (= surface $s3))
                           ] root wtype surface)
   )
 
-(defun my-db-morph-status-insert (root wtype surface status)
+(defun yk-db-morph-status-insert (root wtype surface status)
+  "insert new tuple"
   (let (
-        (today (my-get-time-date))
+        (today (yk-get-time-date))
         )
                                         ;
-     (emacsql my-status-db [:insert :into words
+     (emacsql yk-db-status [:insert :into words
                               :values ([$s1 $s2 $s3 $s4 $s5])] root wtype surface status today)
      ))
 
-(defun my-db-morph-status-update (root wtype surface status)
-  (my-db-morph-status-delete root wtype surface)
+(defun yk-db-morph-status-update (root wtype surface status)
+  "update new tuple by deleting it, then inserting"
+  (yk-db-morph-status-delete root wtype surface)
   
   (if (not (string-equal status "unknown"))
-   (my-db-morph-status-insert root wtype surface status))
+   (yk-db-morph-status-insert root wtype surface status))
   )
 
-(setq my-status-table (make-hash-table :test 'equal))
+;; initialize hash table
+(setq yk-status-table (make-hash-table :test 'equal))
 
-(setq my-repeat-counter 0)
+;; counter for profiling purposes
+(setq yk-repeat-counter 0)
 
-(defun my-morph-status-get (root wtype surface)
+(defun yk-morph-status-get (root wtype surface)
+  "memoized function that checks for the status of a given morph."
   ;; memoize the status of the given morph
-  (or (gethash (list root wtype surface) my-status-table)
+  (or (gethash (list root wtype surface) yk-status-table)
       (let
           (
            (status (nth 2
-                        (my-db-morph-status-get root wtype surface)))
+                        (yk-db-morph-status-get root wtype surface)))
            )
-        (setq my-repeat-counter (+ my-repeat-counter 1))
+        (setq yk-repeat-counter (+ yk-repeat-counter 1))
 ;        (message "gone to the db [%s]" status)
         (puthash (list root wtype surface)
                  status
-                 my-status-table)        
+                 yk-status-table)        
         )        
     ))
 
-(defun my-morph-status-set (root wtype surface status)
+(defun yk-morph-status-set (root wtype surface status)
+  "stores new status in db if needed, updating memoization table"
 ;  (message "entering")
   (let(
-       (curval (my-morph-status-get root wtype surface))
+       (curval (yk-morph-status-get root wtype surface))
        )
     (unless (and curval
                  (string-equal curval status)
              )
       ;; cache does not have it or it is different
-      (my-db-morph-status-update root wtype surface status)
-      (puthash (list root wtype surface) status my-status-table)
+      (yk-db-morph-status-update root wtype surface status)
+      (puthash (list root wtype surface) status yk-status-table)
       )
     ))
 
 
-(defun my-katakana-to-hiragana (str)
-  "Convert katakana to hiragana."
+(defun yk-katakana-to-hiragana (str)
+  "Convert katakana to hiragana. Very rough, but it works"
   (mapconcat
    (lambda (c)
      (if (and (>= c #x30a1) (<= c #x30f6))
@@ -230,80 +246,57 @@
        (char-to-string c)))
    str ""))
 
-(defun my-do-region (beg end)
-  "jp-ize the buffer
-
-     1. Run mecab command on the current buffer asynchronously,
-     2. Process the output.
-     3. kill output buffer
-"
+(defun yk-do-region (beg end)
+  "jk-ize the region"
   (interactive "r")
+  ;; remove current info in region
+  (yk-remove-props-and-overlays beg end)
+  
+  (if (bufferp yk-process-buffer)
+      (kill-buffer yk-process-buffer))
 
-  (my-remove-props-and-overlays beg end)
-  ;; kill the buffer if it exists
-  (if (bufferp my-process-buffer)
-      (kill-buffer my-process-buffer))
-
-  (my-process-region beg end)
+  ;; do the work
+  (yk-process-region beg end)
   )
 
-(defun my-do-buffer ()
+(defun yk-do-buffer ()
+  "jk-ize the region"
   (interactive)
-  (my-do-region (point-min) (point-max))
+  (yk-do-region (point-min) (point-max))
   )
 
 
-(defun my-pos ()
-  (interactive)
-  (message "%s" (point))
-  )
-              
-(defun my-until-eoln (st)
-  (substring st 0 (string-match "\n" st))
-  )
-
-(defun my-abc ()
-  (interactive)
-  (find-file "/tmp/alice.txt")
-  )
+;;;;;;;;;;;;;faces
 
 
-(defun my-test ()
-  (interactive)
-  (kill-buffer "*Messages*")
-  (kill-buffer "alice.txt")
-  (find-file "/tmp/alice.txt")
-  (load-file "/Users/dmg/.emacs.d/dmg-jp.el")
-  (setq patito32 (my-command-on-buffer))
-  )
-
-(defface my-face-unknown
+(defface yk-face-unknown
   '((t ( :background "LightYellow2"
                 )))
   "Face for default unknown text"
   :group 'my)
 
-(defface my-face-learning
+(defface yk-face-learning
   '((t ( :background "PaleGreen1"
          )))
   "Face for default learning text"
   :group 'my)
 
-(defface my-face-ignore
+(defface yk-face-ignore
   '((t ( :background "gray90"
          )))
   "Face for default learning text"
   :group 'my)
 
+;; for grammatical entities
 
-(defface my-face-noun
+(defface yk-face-noun
   '((t (:inherit font-lock-string-face
                  )))
   "Face for noun unknown"
   :group 'my
   )
 
-(defface my-face-noun-alt
+(defface yk-face-noun-alt
   `((((class color) (background light))
      (:foreground  "darkblue"))
     (((class color) (background dark))
@@ -311,23 +304,14 @@
   "Face for nouns alt."
   :group 'my)
 
-;;font-lock-keyword-face
-;; (defface my-face-verb
-;;   `((((class color) (background light))
-;;      (:foreground  "darkgreen"))
-;;     (((class color) (background dark))
-;;      (:foreground  "red")))
-;;   "Face for verbs."
-;;   :group 'my)
-
-(defface my-face-verb
+(defface yk-face-verb
   '((t (:inherit font-lock-keyword-face
                  )))
   "Face for verb"
   :group 'my
   )
 
-(defface my-face-morpheme
+(defface yk-face-morpheme
   `((((class color) (background light))
      (:foreground  "magenta"))
     (((class color) (background dark))
@@ -335,7 +319,7 @@
   "Face for verbs."
   :group 'my)
 
-(defface my-face-adverb
+(defface yk-face-adverb
   `((((class color) (background light))
      (:foreground  "purple"))
     (((class color) (background dark))
@@ -343,7 +327,7 @@
   "Face for adverbs."
   :group 'my)
 
-(defface my-face-adjective
+(defface yk-face-adjective
   `((((class color) (background light))
      (:foreground  "orange"))
     (((class color) (background dark))
@@ -351,7 +335,7 @@
   "Face for adjectives."
   :group 'my)
 
-(defface my-face-particle
+(defface yk-face-particle
   `((((class color) (background light))
      (:foreground  "darkgrey"))
     (((class color) (background dark))
@@ -359,7 +343,7 @@
   "Face for particles."
   :group 'my)
 
-(defface my-face-punctuation
+(defface yk-face-punctuation
   `((((class color) (background light))
      (:foreground  "black"))
     (((class color) (background dark))
@@ -367,132 +351,142 @@
   "Face for particles."
   :group 'my)
 
-(defface my-face-noun-unknown
-  '((t (:inherit ( my-face-noun  my-face-unknown))))
+;; combined unknown and grammar point
+(defface yk-face-noun-unknown
+  '((t (:inherit ( yk-face-noun  yk-face-unknown))))
   "Face for noun unknown")
 
-(defface my-face-particle-unknown
-  '((t (:inherit ( my-face-particle  my-face-unknown))))
+(defface yk-face-particle-unknown
+  '((t (:inherit ( yk-face-particle  yk-face-unknown))))
   "Face for particle unknown")
 
-(defface my-face-verb-unknown
-  '((t (:inherit ( my-face-verb  my-face-unknown))))
+(defface yk-face-verb-unknown
+  '((t (:inherit ( yk-face-verb  yk-face-unknown))))
   "Face for verb unknown")
 
-(defface my-face-adverb-unknown
-  '((t (:inherit ( my-face-adverb  my-face-unknown))))
+(defface yk-face-adverb-unknown
+  '((t (:inherit ( yk-face-adverb  yk-face-unknown))))
   "Face for Adverb unknown")
 
-(defface my-face-punctuation-unknown
-  '((t (:inherit ( my-face-punctuation  my-face-unknown))))
+(defface yk-face-punctuation-unknown
+  '((t (:inherit ( yk-face-punctuation  yk-face-unknown))))
   "Face for punctuation unknown")
 
-(defface my-face-morpheme-unknown
-  '((t (:inherit ( my-face-morpheme  my-face-unknown))))
+(defface yk-face-morpheme-unknown
+  '((t (:inherit ( yk-face-morpheme  yk-face-unknown))))
   "Face for morpheme unknown")
 
-(defface my-face-adjective-unknown
-  '((t (:inherit (my-face-adjective my-face-unknown)                
+(defface yk-face-adjective-unknown
+  '((t (:inherit (yk-face-adjective yk-face-unknown)                
                  )))
   "Face for adjective unknown")
 
+;; learning
 
-(defface my-face-noun-learning
-  '((t (:inherit ( my-face-noun  my-face-learning))))
+(defface yk-face-noun-learning
+  '((t (:inherit ( yk-face-noun  yk-face-learning))))
   "Face for noun learning")
 
-(defface my-face-particle-learning
-  '((t (:inherit ( my-face-particle  my-face-learning))))
+(defface yk-face-particle-learning
+  '((t (:inherit ( yk-face-particle  yk-face-learning))))
   "Face for particle learning")
 
-(defface my-face-verb-learning
-  '((t (:inherit ( my-face-verb  my-face-learning))))
+(defface yk-face-verb-learning
+  '((t (:inherit ( yk-face-verb  yk-face-learning))))
   "Face for verb learning")
 
-(defface my-face-adverb-learning
-  '((t (:inherit ( my-face-adverb  my-face-learning))))
+(defface yk-face-adverb-learning
+  '((t (:inherit ( yk-face-adverb  yk-face-learning))))
   "Face for Adverb learning")
 
-(defface my-face-punctuation-learning
-  '((t (:inherit ( my-face-punctuation  my-face-learning))))
+(defface yk-face-punctuation-learning
+  '((t (:inherit ( yk-face-punctuation  yk-face-learning))))
   "Face for punctuation learning")
 
-(defface my-face-morpheme-learning
-  '((t (:inherit ( my-face-morpheme  my-face-learning))))
+(defface yk-face-morpheme-learning
+  '((t (:inherit ( yk-face-morpheme  yk-face-learning))))
   "Face for morpheme learning")
 
-(defface my-face-adjective-learning
-  '((t (:inherit (my-face-adjective my-face-learning)                
+(defface yk-face-adjective-learning
+  '((t (:inherit (yk-face-adjective yk-face-learning)                
                  )))
   "Face for adjective learning")
 
+;; the lookup tables
 
-(defvar my-wtype-table '(
-                         ("名詞" . my-face-noun)
-                         ("助詞" . my-face-particle)
-                         ("動詞" . my-face-verb)
-                         ("副詞" . my-face-adverb)
-                         ("記号" . my-face-punctuation)
-                         ("助動詞" . my-face-morpheme)
-                         ("形容詞" . my-face-adjective)
+(defvar yk-wtype-table '(
+                         ("名詞" . yk-face-noun)
+                         ("助詞" . yk-face-particle)
+                         ("動詞" . yk-face-verb)
+                         ("副詞" . yk-face-adverb)
+                         ("記号" . yk-face-punctuation)
+                         ("助動詞" . yk-face-morpheme)
+                         ("形容詞" . yk-face-adjective)
                          ))
 
-(defvar my-wtype-table-status-unknown '(
-                         ("名詞" . my-face-noun-unknown)
-                         ("助詞" . my-face-particle-unknown)
-                         ("動詞" . my-face-verb-unknown)
-                         ("副詞" . my-face-adverb-unknown)
-                         ("記号" . my-face-punctuation-unknown)
-                         ("助動詞" . my-face-morpheme-unknown)
-                         ("形容詞"   . my-face-adjective-unknown)
-                         ("default" . my-face-unknown)
+(defvar yk-wtype-table-status-unknown '(
+                         ("名詞" . yk-face-noun-unknown)
+                         ("助詞" . yk-face-particle-unknown)
+                         ("動詞" . yk-face-verb-unknown)
+                         ("副詞" . yk-face-adverb-unknown)
+                         ("記号" . yk-face-punctuation-unknown)
+                         ("助動詞" . yk-face-morpheme-unknown)
+                         ("形容詞"   . yk-face-adjective-unknown)
                          ))
 
 
-(defvar my-wtype-table-status-learning'(
-                                        ("名詞" . my-face-noun-learning)
-                                        ("助詞" . my-face-particle-learning)
-                                        ("動詞" . my-face-verb-learning)
-                                        ("副詞" . my-face-adverb-learning)
-                                        ("記号" . my-face-punctuation-learning)
-                                        ("助動詞" . my-face-morpheme-learning)
-                                        ("形容詞" . my-face-adjective-learning)
+(defvar yk-wtype-table-status-learning'(
+                                        ("名詞" . yk-face-noun-learning)
+                                        ("助詞" . yk-face-particle-learning)
+                                        ("動詞" . yk-face-verb-learning)
+                                        ("副詞" . yk-face-adverb-learning)
+                                        ("記号" . yk-face-punctuation-learning)
+                                        ("助動詞" . yk-face-morpheme-learning)
+                                        ("形容詞" . yk-face-adjective-learning)
                                         ))
 
 
-(defvar my-font-table-default-status '(
-                                       ("unknown" . my-face-unknown)
-                                       ("learning" . my-face-learning)
-                                       ("ignore" .   my-face-ignore)
+(defvar yk-font-table-default-status '(
+;; known  does not have an entry, since it is not fontified
+                                       ("unknown" . yk-face-unknown)
+                                       ("learning" . yk-face-learning)
+                                       ("ignore" .   yk-face-ignore)
                                        ))
 
-(defun my-has-japanese-characters-p (str)
-  "Check if STR has any Japanese characters."
-  (not (string-match-p "\\`[[:ascii:]]*\\'" str))
-  
-  )
+(defun yk-font-table-to-use (status)
+  "This is the core of the fontification.
+   Depending on the status, return a given table.
 
-(defun my-font-table-to-use (status)
+   Defaults to the unknown table
+
+"
   (cond 
-   ((string-equal "known" status)     my-wtype-table)
-   ((string-equal "learning" status)  my-wtype-table-status-learning)
-   (my-wtype-table-status-unknown)
+   ((string-equal "known" status)     yk-wtype-table)
+   ((string-equal "learning" status)  yk-wtype-table-status-learning)
+   (yk-wtype-table-status-unknown)
    )
-  
   )
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun my-morph-do-phrases (cmpfun pfun)
-  "process each phrase (pfun phrase) that satisfies cmpfun at point
-and call pfun on it"
+;; some high order functions to
+;;    process using pfun phrases and morphs in the current buffer
+;;    whe the cmpfun returns tru
+
+;; a phrase is any japanese text between punctuation
+
+(defun yk-morph-do-phrases (cmpfun pfun)
+  "process each phrase (pfun begin end) that satisfies (cmpfun begin)"
   (let ((pos (point-min)))
     (while pos
-      (when (and (get-text-property pos 'my-morph)
+      (when (and (get-text-property pos 'yk-morph)
                  (funcall cmpfun pos))
-        (funcall pfun pos (next-single-property-change pos 'my-morph)))
-      (setq pos (next-single-property-change pos 'my-morph))
+        (funcall pfun pos (next-single-property-change pos 'yk-morph)))
+      (setq pos (next-single-property-change pos 'yk-morph))
       )))
 
-(defun my-morph-do-morphs-in-region (beg end cmpfun pfun)
+
+(defun yk-morph-do-morphs-in-region (beg end cmpfun pfun)
+  "process each morph (pfun begin end) that satisfies (cmpfun begin)"
   (let ((pos beg))
     (while (and pos
             (< pos end))
@@ -503,11 +497,12 @@ and call pfun on it"
       (setq pos (next-single-property-change pos 'begin))
       )))
 
-(defun my-get-tokens-region (beg end)
+(defun yk-get-tokens-region (beg end)
+  "return a list of all the tokens in the region"
   (let(
        (lst (list))
        )
-    (my-morph-do-morphs-in-region beg end
+    (yk-morph-do-morphs-in-region beg end
                                   (lambda (pos) t)
                                   (lambda (pos end)
                                     (setq lst (cons
@@ -523,7 +518,15 @@ and call pfun on it"
   )
 
 
-(defun my-build-potential-candidates (lst len)
+(defun yk-has-japanese-characters-p (str)
+  "return t if str has any Japanese characters."
+  (not (string-match-p "\\`[[:ascii:]]*\\'" str))
+  
+  )
+
+
+
+(defun yk-build-potential-candidates (lst len)
   ;; lst is a list of pairs (surface seen)
 ;  (message "build [%s] [%d]" lst len)
   (if (>= (length lst) len)
@@ -554,7 +557,7 @@ and call pfun on it"
       )
   )
 
-(defun my-find-compound (lst candidates)
+(defun yk-find-compound (lst candidates)
   ;; see what is the longest substring
   ;; starting from position 0
   ;; that is found in candidates
@@ -570,7 +573,7 @@ and call pfun on it"
             (not compound)
             (> n 1))
       (let* (
-            (current (my-build-potential-candidates lst n))
+            (current (yk-build-potential-candidates lst n))
             (cur-surface (nth 0 current))
             (cur-seen    (nth 1 current))
             )
@@ -608,9 +611,9 @@ and call pfun on it"
     )
   )
 
-(defvar my-compound-occurences 0)
+(defvar yk-compound-occurences 0)
 
-(defun my-find-compound-matches (lst)
+(defun yk-find-compound-matches (lst)
   
   
   (let (
@@ -630,15 +633,15 @@ and call pfun on it"
             
             )
       (let* (
-             (candidates        (my-build-potential-candidates lst 2))
+             (candidates        (yk-build-potential-candidates lst 2))
              ;;            TODO this is slowing down things... but there might be situations
              ;; where a root ending of a compound of two might match
              ;; but maybe it is too small to worry about it?
              ;; but it might affect verbs primarily
-;;           (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
-             (db-candidates     (my-db-compound-prefix-candidates (nth 1 candidates)))
+;;           (surface-matches-p (yk-db-compound-exists (nth 0 candidates)))
+             (db-candidates     (yk-db-compound-prefix-candidates (nth 1 candidates)))
              (compound          (and db-candidates
-                                     (my-find-compound lst db-candidates) 
+                                     (yk-find-compound lst db-candidates) 
                                      ))
              (compound-len (and compound
                                      (nth 1 compound)))
@@ -676,10 +679,10 @@ and call pfun on it"
     )
   )
 
-(defun my-mark-as-compound (lst)
+(defun yk-mark-as-compound (lst)
   ;; this function is probably slower than it can be
   ;; but it not executed a lot
-  (setq my-compound-occurences (+ 1 my-compound-occurences))
+  (setq yk-compound-occurences (+ 1 yk-compound-occurences))
   (let*(
        (beg (car (nth 0 lst)))
        (end (car (nth 1 lst)))
@@ -697,11 +700,11 @@ and call pfun on it"
     )
   )
 
-(defun my-find-compounds (beg end)
+(defun yk-process-compounds-in-phrase (beg end)
 ;  (message "sentence [%s]" (buffer-substring beg end))
   (let* (
-         (p-tokens (my-get-tokens-region beg end))
-         (matches (my-find-compound-matches p-tokens))
+         (p-tokens (yk-get-tokens-region beg end))
+         (matches (yk-find-compound-matches p-tokens))
         )
     ;;      (message "tokens [%s]" p-tokens)
     (when matches
@@ -709,7 +712,7 @@ and call pfun on it"
                               
 ;      (message "matches [%s]" matches)
       (mapc
-       'my-mark-as-compound
+       'yk-mark-as-compound
        matches
        )
       )
@@ -717,20 +720,21 @@ and call pfun on it"
     )  
   )
 
-(defun my-do-all-compounds ()
+(defun yk-do-all-compounds ()
   (interactive)
-  (setq my-compound-occurences 0)
+  (setq yk-compound-occurences 0)
+  (yk-db-dict-open)
   (with-silent-modifications 
-    (my-morph-do-phrases
+    (yk-morph-do-phrases
      (lambda (pos) t)
-     'my-find-compounds
+     'yk-process-compounds-in-phrase
      ))
-  (message "Done. Found [%s] compounds" my-compound-occurences)
+  (message "Done. Found [%s] compounds" yk-compound-occurences)
   )
 
 
 
-(defun my-morph-do-morphs (cmpfun pfun)
+(defun yk-morph-do-morphs (cmpfun pfun)
   "process each moph(beg end) that satisfies cmpfun(beg)
 and call pfun on it"
   (let ((pos (point-min)))
@@ -741,7 +745,7 @@ and call pfun on it"
       (setq pos (next-single-property-change pos 'begin))
       )))
 
-(defun my-morph-matches-at (morphProps pos)
+(defun yk-morph-matches-at (morphProps pos)
   (let ((pos (point))
          (props (text-properties-at pos))
          )
@@ -761,7 +765,7 @@ and call pfun on it"
   
   )
 
-(defun my-morphs-delete-overlays-at-pos (beg end)
+(defun yk-morphs-delete-overlays-at-pos (beg end)
   "delete overlays between beg and end"
   (dolist (overlay (overlays-in beg end))
     (message "deleting... overlay [%s]" overlay)
@@ -769,7 +773,7 @@ and call pfun on it"
   )
 
 
-(defun my-test-all ()
+(defun yk-test-all ()
   (interactive)
 
   (let* ((pos (point))
@@ -777,14 +781,14 @@ and call pfun on it"
          )
     ;; process the morphs that match this one
     ;; and replace the overlays
-    (my-morph-do-morphs
-     (lambda (beg) (my-morph-matches-at props beg  )););
+    (yk-morph-do-morphs
+     (lambda (beg) (yk-morph-matches-at props beg  )););
       )
-    'my-morphs-delete-overlays-at-pos
+    'yk-morphs-delete-overlays-at-pos
     )
   )
 
-(defun my-remove-props-and-overlays (beg end)
+(defun yk-remove-props-and-overlays (beg end)
   (interactive "r")
   ;; find all props and remove them
   ;; find all overlays and remove them
@@ -795,17 +799,17 @@ and call pfun on it"
                                            surface nil
                                            pronun  nil
                                            begin   nil
-                                           my-morph nil
+                                           yk-morph nil
                                            end     nil
                                            status  nil
                                            ))
-    (remove-overlays beg end 'my-name t)
+    (remove-overlays beg end 'yk-name t)
   )))
 
-(setq my-test-all-morphs (make-hash-table :test 'equal));(list))
-;;(setq my-status-table (make-hash-table :test 'equal))
+(setq yk-test-all-morphs (make-hash-table :test 'equal));(list))
+;;(setq yk-status-table (make-hash-table :test 'equal))
 
-(defun my-morph-get-morph-from-props (props)
+(defun yk-morph-get-morph-from-props (props)
   "get the morph from the properties"
   (list
    (plist-get props 'root)
@@ -814,7 +818,7 @@ and call pfun on it"
    )
   )
 
-(defun my-morph-get-from-props (props attr)
+(defun yk-morph-get-from-props (props attr)
   "get specific attribute from props
 this might be redundant, but it is trying to create a layer between
 properties and data
@@ -822,7 +826,7 @@ properties and data
   (plist-get props attr)
   )
 
-(defun my-sort-hash-table (hash-table compare-func)
+(defun yk-sort-hash-table (hash-table compare-func)
   "Return a sorted list of key-value pairs from HASH-TABLE.
 The list is sorted using COMPARE-FUNC to compare elements."
   (let (pairs)
@@ -832,19 +836,19 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (sort pairs compare-func)))
                                         ;
 
-(defun my-extract-all-morphs ()
+(defun yk-extract-all-morphs ()
   "return a hashtable where the key is the morph, and the value the frequency"
   (let
       (
        (all-morphs (make-hash-table :test 'equal) )
        )
-    (my-morph-do-morphs
+    (yk-morph-do-morphs
      (lambda (beg) (plist-get (text-properties-at beg) 'root))   ;; process all morphs
      (lambda (beg end)  ;; add morphs to the hashtable
        (let*
            (
             (props (text-properties-at beg))
-            (morph (my-morph-get-morph-from-props props))
+            (morph (yk-morph-get-morph-from-props props))
             )
          (message "%s" props)
          ;; increase their counter by 1
@@ -854,18 +858,18 @@ The list is sorted using COMPARE-FUNC to compare elements."
          ))
      )
 ;    (message "[%s]" all-morphs)
-    (my-sort-hash-table all-morphs
+    (yk-sort-hash-table all-morphs
                         (lambda (a b) (> (cdr a) (cdr b)))
                         )
     )
   )
 
-(defun my-report-all-morphs ()
+(defun yk-report-all-morphs ()
   "report the frequency of morphs"
   (interactive)
   (let (
-        (morphs (my-extract-all-morphs))
-;        (buffer (create... my-report-buffer))
+        (morphs (yk-extract-all-morphs))
+;        (buffer (create... yk-report-buffer))
         )
     
     (mapc 
@@ -876,24 +880,24 @@ The list is sorted using COMPARE-FUNC to compare elements."
     )
   )
 
-(defun my-update-status-at-position (beg end wtype newstatus)
+(defun yk-update-status-at-position (beg end wtype newstatus)
   ;;
   ;;  replace the overlays at the given position
   ;;  according to the new status
   ;;
-  (my-morphs-delete-overlays-at-pos beg end)
-  (my-set-overlay-at-pos beg end wtype newstatus)
+  (yk-morphs-delete-overlays-at-pos beg end)
+  (yk-set-overlay-at-pos beg end wtype newstatus)
 )
 
 
-(defun my-replace-all-overlays (props newstatus)
+(defun yk-replace-all-overlays (props newstatus)
   ;;                                      ;
   ;; replace all the overlays of the given morph in all the document
   ;; according to the new status
   ;; 
-  (my-morph-do-morphs
-   (lambda (beg)      (my-morph-matches-at props beg  )););
-   (lambda (beg end)  (my-update-status-at-position beg
+  (yk-morph-do-morphs
+   (lambda (beg)      (yk-morph-matches-at props beg  )););
+   (lambda (beg end)  (yk-update-status-at-position beg
                                                     end
                                                     (plist-get props 'wtype)    
                                                     newstatus
@@ -903,7 +907,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
 
   )
 
-(defun my-morph-new-status (props new-status)
+(defun yk-morph-new-status (props new-status)
   ;; mark the morph in props as new status
   ;; in the database and in the database
   ;; 
@@ -920,24 +924,24 @@ The list is sorted using COMPARE-FUNC to compare elements."
           (message "setting new status [%s] old [%s]" new-status old-status)
           (message "   root [%s] wtype [%s] surface [%s]" root wtype surface)
           ; we need to set the status of that word everywhere...
-          (my-morph-status-set root wtype surface new-status)
+          (yk-morph-status-set root wtype surface new-status)
           ;; now we have to process the document to find instances of the word
           ;; ... there is a need for a redo buffer
           ;; but that is expensive, soo simply scan the document
           ;; and find any instances of the morph
           ;; and change its property
           ;; first remove all overlays in the file
-          (my-replace-all-overlays props new-status)
+          (yk-replace-all-overlays props new-status)
           )
       (message "morph (%s %s %s)already has [%s] status" root wtype surface new-status)
       )
     ))
 
-;; (defun my-mark-morph-as-known (beg end)
+;; (defun yk-mark-morph-as-known (beg end)
   
 ;;   )
 
-;; (defun my-morph-set-known ()
+;; (defun yk-morph-set-known ()
 ;;   (interactive)
 ;;   (let* (
 ;;          (pos (point))
@@ -947,37 +951,37 @@ The list is sorted using COMPARE-FUNC to compare elements."
 ;;              (plist-get props 'root)
 ;;              )
 ;;         (progn ;
-;;           (my-morph-new-status props "known")
+;;           (yk-morph-new-status props "known")
 
-;;           (my-morph-do-morphs
-;;            (lambda (beg) (my-morph-matches-at props beg  )););
-;;            'my-mark-as-known
+;;           (yk-morph-do-morphs
+;;            (lambda (beg) (yk-morph-matches-at props beg  )););
+;;            'yk-mark-as-known
 ;;            )
 ;;           )
 ;;       )
 ;;     )
 ;;   )
 
-(defun my-wtype-status-to-face (wtype status)
+(defun yk-wtype-status-to-face (wtype status)
                                         ;  (and
-;  (message "inside my-wtype-status-to-face [%s][%s]" wtype status)
+;  (message "inside yk-wtype-status-to-face [%s][%s]" wtype status)
   (let* (
-        (font-table (my-font-table-to-use status))
+        (font-table (yk-font-table-to-use status))
         (face (assoc wtype font-table))
         )
 ;    (message "inside let [%s]" face)
 ;    (message "table used [%s]" font-table)
     (if face
         (cdr face)
-      (assoc status my-font-table-default-status)
+      (assoc status yk-font-table-default-status)
         )
     )   
   )
 
 
-(defun my-set-overlay-at-pos (beg end wtype status)
+(defun yk-set-overlay-at-pos (beg end wtype status)
   (let (
-        (face (my-wtype-status-to-face wtype status))
+        (face (yk-wtype-status-to-face wtype status))
         )
 
     (if face
@@ -985,14 +989,14 @@ The list is sorted using COMPARE-FUNC to compare elements."
               (ovl (make-overlay beg end));)
               )
           (overlay-put ovl 'font-lock-face face)
-          (overlay-put ovl 'my-name t)
+          (overlay-put ovl 'yk-name t)
           )
         )
     )
   )
 
 
-(defun my-set-text-prop-token (token)
+(defun yk-set-text-prop-token (token)
   ;(message "setting prope [%s]" token)
   (let*
       (
@@ -1001,11 +1005,11 @@ The list is sorted using COMPARE-FUNC to compare elements."
        (wtype (plist-get token 'wtype))
        (seen (plist-get token 'seen))
        (surface (plist-get token 'surface))
-       (status (my-morph-status-get root wtype surface))
+       (status (yk-morph-status-get root wtype surface))
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
-;       (face (my-wtype-status-to-face wtype status))
+;       (face (yk-wtype-status-to-face wtype status))
        )
-    (my-set-overlay-at-pos beg end wtype status)
+    (yk-set-overlay-at-pos beg end wtype status)
     (if status
         (put-text-property beg end 'status status)
       )
@@ -1014,30 +1018,30 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (put-text-property beg end 'wtype  wtype)
     (put-text-property beg end 'root root)
     (put-text-property beg end 'surface surface)
-    (put-text-property beg end 'my-morph t)
+    (put-text-property beg end 'yk-morph t)
     (put-text-property beg end 'seen seen)
 
     ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
-                       (my-katakana-to-hiragana (plist-get token 'pronun)))))
+                       (yk-katakana-to-hiragana (plist-get token 'pronun)))))
 
 
-(defun my-process-wtype-p (token)
+(defun yk-process-wtype-p (token)
   (and
-   (assoc (plist-get token 'wtype) my-wtype-table)
-;   (my-has-japanese-characters-p (plist-get token 'surface))
+   (assoc (plist-get token 'wtype) yk-wtype-table)
+;   (yk-has-japanese-characters-p (plist-get token 'surface))
    )  
   )
 
-(defun my-process-tokens(jpTokens)
+(defun yk-process-tokens(jpTokens)
   ;; make sure database is open
-  (my-db-open)
+  (yk-db-status-open)
   (with-silent-modifications
     (dolist (token jpTokens)
       
-      (if (my-has-japanese-characters-p (plist-get token 'seen))
-;;          (if (my-process-wtype-p token)
-              (my-set-text-prop-token token)            
+      (if (yk-has-japanese-characters-p (plist-get token 'seen))
+;;          (if (yk-process-wtype-p token)
+              (yk-set-text-prop-token token)            
 ;;            )
         
         )    
@@ -1073,70 +1077,70 @@ The list is sorted using COMPARE-FUNC to compare elements."
       )
     )
     
-(defun my-prop-at-point ()
+(defun yk-prop-at-point ()
   (interactive)
   (let* ((pos (point))
          (props (text-properties-at pos)))
     (message "Properties at position %d: %s" pos props)))
 
 
-(defun my-properties-at-point ()
+(defun yk-properties-at-point ()
   (let* ((pos (point))
          (props (text-properties-at pos)))
-    (if (plist-get props 'my-morph)
+    (if (plist-get props 'yk-morph)
         props
       nil
         )))
   
   
-(defun my-mark-at-point-as-ignored ()
+(defun yk-mark-at-point-as-ignored ()
   (interactive)
   (let* (
-         (props (my-properties-at-point)))
+         (props (yk-properties-at-point)))
     (if props
-        (my-morph-new-status props "ignore")
+        (yk-morph-new-status props "ignore")
         )
     )
   )
 
-(defun my-mark-at-point-as-known ()
+(defun yk-mark-at-point-as-known ()
   (interactive)
   (let* (
-         (props (my-properties-at-point)))
+         (props (yk-properties-at-point)))
     (if props
-        (my-morph-new-status props "known")
+        (yk-morph-new-status props "known")
       )
     )
   )
 
-(defun my-mark-at-point-as-unknown ()
+(defun yk-mark-at-point-as-unknown ()
 (interactive)
 (let* (
-       (props (my-properties-at-point)))
+       (props (yk-properties-at-point)))
   (if props
-      (my-morph-new-status props "unknown")
+      (yk-morph-new-status props "unknown")
     )
   )
 )
 
-(defun my-mark-at-point-as-learning ()
+(defun yk-mark-at-point-as-learning ()
   (interactive)
   (let* (
-         (props (my-properties-at-point)))
+         (props (yk-properties-at-point)))
     (if props
-        (my-morph-new-status props "learning")
+        (yk-morph-new-status props "learning")
       )
     )
   )
 
-(defun my-process-filter (beg end output)
+(defun yk-process-filter (beg end output)
   "Process OUTPUT from mecab one line at a time using jp-process."
-  (message "Starting [%s]" (my-until-eoln output))
+  (message "Starting [%s]" (yk-until-eoln output))
   (let* (
          (lines (split-string output "\n" t))
-         (tokens  (mapcar #'my-mecab-process-line lines))         ;
+         (tokens  (mapcar #'yk-mecab-process-line lines))         ;
          )
-    (my-sync-list-to-st
+    (yk-sync-list-to-st
      tokens
      (buffer-substring beg end)
      beg
@@ -1144,7 +1148,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
     ))
 
 
-(defun my-mecab-process-line (line)
+(defun yk-mecab-process-line (line)
   "maps a mecab output line into a pair (surface properties)
 Properties is a property-list with information about the 
 "
@@ -1167,7 +1171,7 @@ Properties is a property-list with information about the
     ))
 )
 
-(defun my-list-add-running-length (pairs)
+(defun yk-list-add-running-length (pairs)
   "Convert a list of pairs of strings to a list of lists of three elements,
     Each list has 3 elements: the accumulative sum of the length of the first
   string of the input pairs, the first string in the pair, and the third string
@@ -1182,7 +1186,7 @@ Properties is a property-list with information about the
                                            accumulative-length (car pair) (nth 1 pair))))))
     running-lengths))
 
-(defun my-sync-list-to-st (lst st regionOffset)
+(defun yk-sync-list-to-st (lst st regionOffset)
   "Unfortunately mecab does not output all characters (e.g. spaces). This means
   we need to find out where in the text each token is.
 
@@ -1190,7 +1194,7 @@ Properties is a property-list with information about the
   they occur.
 
 "
-  (message "entering [%s]" (my-until-eoln st))
+  (message "entering [%s]" (yk-until-eoln st))
   (message "%s " (car lst))
   (let (
         (output (list))
@@ -1209,11 +1213,11 @@ Properties is a property-list with information about the
                (prefix    (substring st offset (+ nextLen offset)))
                )
 ;          (message "entering iteration %d offset %d lenSt %d len tokens [%d] next [%s]" counter offset lenSt (length lst) (nth 0 lst))
-          (if (< counter my-max-tokens-to-process)
+          (if (< counter yk-max-tokens-to-process)
             ;; just in case we get into an infinite loop, or the input is humongous
               (progn
                 (setq counter (+ counter 1))
-  ;              (message "[%d]current string [%d] [%s]" counter offset (my-until-eoln (substring st offset)))
+  ;              (message "[%d]current string [%d] [%s]" counter offset (yk-until-eoln (substring st offset)))
 ;                (message "    next token [%s]" nextToken)
 ;                (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
                 (if (string-equal next prefix ) ; test matches
@@ -1261,7 +1265,7 @@ Properties is a property-list with information about the
       (nreverse output)
       )))
 
-(defun my-process-mecab (beg end mecabBuffer)
+(defun yk-process-mecab (beg end mecabBuffer)
   "Process mecab output mecab on region.
 
   buffer is the process output from mecab
@@ -1283,33 +1287,33 @@ Properties is a property-list with information about the
                )
        (message "done processing raw mecab")
        ;; save mecab ouptut, remove end-of-process message
-       (outputMecab (substring output 0 (string-match my-process-end-st output)))
+       (outputMecab (substring output 0 (string-match yk-process-end-st output)))
        ;; separate tokens
-       (jpTokens (my-process-filter beg end outputMecab))
+       (jpTokens (yk-process-filter beg end outputMecab))
        (message "done processing processing tokens")
 
        )
     (message "finished mecab processng %d tokens" (length jpTokens))
 ;    (message "[%s]" jpTokens )
     ;; process the tokens
-    (my-process-tokens jpTokens)
+    (yk-process-tokens jpTokens)
     )
   )
 
-(defun my-create-temp-file-from-string (string)
+(defun yk-create-temp-file-from-string (string)
   (let ((temp-file (make-temp-file "tmp-string-")))
     (with-temp-file temp-file
       (insert string))
     temp-file))
 
-(defun my-create-simple-buffer (name)
+(defun yk-create-simple-buffer (name)
   (let ((buffer (generate-new-buffer name)))
     (buffer-disable-undo buffer)
 ;    (with-current-buffer buffer
 ;      (progn
 ;        (setq buffer-undo-list nil)
 ;        (mapc (lambda (x) (funcall x -1))
-;              (my-active-minor-modes))
+;              (yk-active-minor-modes))
 ;
 ;        )
 ;      )
@@ -1317,14 +1321,14 @@ Properties is a property-list with information about the
     )
   )
 
-(defun my-process-region (beg end)
+(defun yk-process-region (beg end)
   ;; it run more way faster using an external file as input
   ;; than piping the text to the process
   (setq process-adaptive-read-buffering t)
   (let* (
-         (proc-buffer (my-create-simple-buffer my-process-buffer))
-        (temp-file (my-create-temp-file-from-string (buffer-substring beg end)))
-        (process (start-process my-process-name proc-buffer my-command temp-file)
+         (proc-buffer (yk-create-simple-buffer yk-process-buffer))
+        (temp-file (yk-create-temp-file-from-string (buffer-substring beg end)))
+        (process (start-process yk-process-name proc-buffer yk-mecab-command temp-file)
                  )
         )
     (progn
@@ -1338,18 +1342,18 @@ Properties is a property-list with information about the
       (message "process sent")
       (while (accept-process-output process))
       (message "mecab Done")
-      (my-process-mecab beg end proc-buffer)
+      (yk-process-mecab beg end proc-buffer)
       (message "finisheb pressing buffer")
-      (kill-buffer my-process-buffer)
+      (kill-buffer yk-process-buffer)
       (delete-file temp-file)
       )      
     )
   )
 
-(defun my-process-region2 (beg end)
+(defun yk-process-region2 (beg end)
   (let (
         
-        (process (start-process-shell-command my-process-name my-process-buffer my-command)
+        (process (start-process-shell-command yk-process-name yk-process-buffer yk-mecab-command)
                  )
         )
     (progn
@@ -1357,9 +1361,9 @@ Properties is a property-list with information about the
       ;; incomplete lines. So wait until all output is created and process it
       (setq process-adaptive-read-buffering t)
       (message "process starting")
-                                        ;      (with-current-buffer my-process-buffer
+                                        ;      (with-current-buffer yk-process-buffer
                                         ;        (mapc (lambda (x) (funcall x -1))
-                                        ;              (my-active-minor-modes))
+                                        ;              (yk-active-minor-modes))
                                         ;        )
 
       (process-send-region process beg end)
@@ -1367,9 +1371,9 @@ Properties is a property-list with information about the
       (message "process sent")
       (while (accept-process-output process))
       (message "mecab Done")
-      (my-process-mecab beg end my-process-buffer)
+      (yk-process-mecab beg end yk-process-buffer)
       (message "finisheb pressing buffer")
-      (kill-buffer my-process-buffer)
+      (kill-buffer yk-process-buffer)
       )      
     )
   )
@@ -1379,7 +1383,7 @@ Properties is a property-list with information about the
 ;; being slower. Wayyyyyyyyyyy slower
 ;; go figure
 
-(defun my-process-mecab-output (beg end outputMecab)
+(defun yk-process-mecab-output (beg end outputMecab)
   "Process mecab output mecab on region.
 
   buffer is the process output from mecab
@@ -1393,18 +1397,18 @@ Properties is a property-list with information about the
 "
   (let*
       (
-       (jpTokens (my-process-filter beg end outputMecab))
+       (jpTokens (yk-process-filter beg end outputMecab))
        )
     (message "finished mecab processng %d tokens" (length jpTokens))
                                         ;    (message "[%s]" jpTokens )
     ;; process the tokens
-    (my-process-tokens jpTokens)
+    (yk-process-tokens jpTokens)
     )
   )
 
 
 
-(defun my-process-region-test (beg end)
+(defun yk-process-region-test (beg end)
   ;; execute command (list of strings)
   ;; return the output of the command
   (interactive "r")
@@ -1413,25 +1417,25 @@ Properties is a property-list with information about the
         (mecabOutput "")
         (output (list))
         (process (make-process
-                  :name "my-process"
+                  :name "yk-process"
                   :buffer nil
-                  :command (list my-command)
-                  :filter 'my-filter
-                  :sentinel 'my-sentinel
+                  :command (list yk-mecab-command)
+                  :filter 'yk-filter
+                  :sentinel 'yk-sentinel
                   )
                  )
         )
-    (defun my-filter (proc string)
-   ;;(message "from [%s] process [%s] string [%s]" my-output proc string)
+    (defun yk-filter (proc string)
+   ;;(message "from [%s] process [%s] string [%s]" yk-output proc string)
       (setq output (cons string output))
       
       )
-    (defun my-sentinel (process event)
+    (defun yk-sentinel (process event)
       (message "Process: [%s] had event [%s]" process event)
       (setq mecabOutput
             (mapconcat 'identity (reverse output) "")
             )
-      (my-process-mecab-output beg end mecabOutput)
+      (yk-process-mecab-output beg end mecabOutput)
       (message "finally finishing with length of output [%d] " (length output))
       )
     (process-send-region process beg end)
@@ -1439,24 +1443,24 @@ Properties is a property-list with information about the
     )
   )
 
-(defun my-visit-site-with-param (base-url parm)
+(defun yk-visit-site-with-param (base-url parm)
   (let ((url (format base-url (url-hexify-string parm))))
     (browse-url url)))
 
-(defun my-jisho-at-point ()
+(defun yk-jisho-at-point ()
   (interactive)
   (save-excursion
     (let* (
-           (term (my-extract-term-at-point))
+           (term (yk-extract-term-at-point))
            )
       (if term
-          (my-visit-site-with-param "https://jisho.org/search/%s" term)
+          (yk-visit-site-with-param "https://jisho.org/search/%s" term)
           )
       )
     )
   )
 
-(defun my-kanji-damage-at-point ()
+(defun yk-kanji-damage-at-point ()
   (interactive)
   (save-excursion
     (let* (
@@ -1464,7 +1468,7 @@ Properties is a property-list with information about the
            )
       ;; todo, check that it is a kanji
       (if kanji
-          (my-visit-site-with-param "http://www.kanjidamage.com/kanji/search?utf8=✓&q=%s" kanji)
+          (yk-visit-site-with-param "http://www.kanjidamage.com/kanji/search?utf8=✓&q=%s" kanji)
         )
       )
     )
@@ -1472,7 +1476,7 @@ Properties is a property-list with information about the
 
 
 
-(defun my-mark-sentence-at-point ()
+(defun yk-mark-sentence-at-point ()
   "Select the sentence around the point delimited by newline and/or 。."
     (interactive)
     (let ((beg (save-excursion
@@ -1490,34 +1494,60 @@ Properties is a property-list with information about the
 
 
 
-(defvar my-minor-map (make-sparse-keymap)
-  "Keymap used my-minor mode")
+(defvar yk-minor-map (make-sparse-keymap)
+  "Keymap used yk-minor mode")
 
-(defun my-disable-mode ()
+(defun yk-disable-mode ()
   (interactive)
-  (message "Exiting my-minor-mode")
-  (my-minor-mode -1)
+  (message "Exiting yk-minor-mode")
+  (yk-minor-mode -1)
   )
 
-(define-key my-minor-map (kbd "=") 'my-mark-sentence-at-point)
-(define-key my-minor-map (kbd "p") 'my-prop-at-point)
-(define-key my-minor-map (kbd "i") 'my-mark-at-point-as-ignored)
-(define-key my-minor-map (kbd "k") 'my-mark-at-point-as-known)
-(define-key my-minor-map (kbd "l") 'my-mark-at-point-as-learning)
-(define-key my-minor-map (kbd "RET") 'yk-define-at-point)
-(define-key my-minor-map (kbd "t") 'yk-extract-term-at-point)
-(define-key my-minor-map (kbd "j") 'my-jisho-at-point)
-(define-key my-minor-map (kbd "m") 'my-kanji-damage-at-point)
-(define-key my-minor-map (kbd "x") 'my-disable-mode)
+(define-key yk-minor-map (kbd "=") 'yk-mark-sentence-at-point)
+(define-key yk-minor-map (kbd "p") 'yk-prop-at-point)
+(define-key yk-minor-map (kbd "i") 'yk-mark-at-point-as-ignored)
+(define-key yk-minor-map (kbd "k") 'yk-mark-at-point-as-known)
+(define-key yk-minor-map (kbd "l") 'yk-mark-at-point-as-learning)
+(define-key yk-minor-map (kbd "RET") 'yk-define-at-point)
+(define-key yk-minor-map (kbd "t") 'yk-extract-term-at-point)
+(define-key yk-minor-map (kbd "j") 'yk-jisho-at-point)
+(define-key yk-minor-map (kbd "m") 'yk-kanji-damage-at-point)
+(define-key yk-minor-map (kbd "x") 'yk-disable-mode)
 
-(define-minor-mode my-minor-mode
+(define-minor-mode yk-minor-mode
   "my help"
 
   :global nil
   :lighter   "_yk_"    ; lighter
-  :keymap my-minor-map             ; keymap
+  :keymap yk-minor-map             ; keymap
 
   ;; this is where the code goes
   )
 
+
+;; some utility functions
+
+(defun yk-pos ()
+  (interactive)
+  (message "%s" (point))
+  )
+
+(defun yk-until-eoln (st)
+  (substring st 0 (string-match "\n" st))
+  )
+
+(defun yk-abc ()
+  (interactive)
+  (find-file "/tmp/alice.txt")
+  )
+
+
+(defun yk-test ()
+  (interactive)
+  (kill-buffer "*Messages*")
+  (kill-buffer "alice.txt")
+  (find-file "/tmp/alice.txt")
+  (load-file "/Users/dmg/.emacs.d/dmg-jp.el")
+  (setq patito32 (yk-mecab-command-on-buffer))
+  )
 

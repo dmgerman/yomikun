@@ -112,7 +112,7 @@ typeface to be used and wide/narrow chars width.
           (cur-char (char-to-string (char-after)))
           )
       ;; if it is a
-      (if (my-has-japanese-characters-p cur-char)
+      (if (yk-has-japanese-characters-p cur-char)
           (progn ;;if
             (re-search-forward "[[:punct:]]" nil t)
             (buffer-substring-no-properties loc (- (match-beginning 0) 1))

@@ -49,7 +49,7 @@ Features:
 - [X] operate in regions    
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
-- [ ] rename everything to something more meaningful
+- [X] rename everything to something more meaningful
 - [ ] remove unnecessary code
 - [ ] reorganize code  
 - [ ] keep track of known kanji?
@@ -101,7 +101,7 @@ You need to install [[https://github.com/magit/emacsql]].
 
 ** installation
 
-- update the variable my-command with the location of the mecab executable. In my case it is a script that setup the proper resources used by mecab.
+- update the variable yk-command with the location of the mecab executable. In my case it is a script that setup the proper resources used by mecab.
   You can see its contents [[./other/m-mecab.sh][here]].
 - copy one of the status databases from [[./dbs/]] into your preferred location. The default location is ~/jp-status.db
 
@@ -110,17 +110,17 @@ You need to install [[https://github.com/magit/emacsql]].
 (require 'jp-token)
 
 ;; replace with your path to mecab
-(setq my-command  "/Users/dmg/bin/osx/m-mecab.sh")
+(setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
 
 ;; replace with your preferred name and location. If the database does not exist, it will be created.
-(setq my-status-db-file "~/jp-status.db")
+(setq yk-status-db-file "~/jp-status.db")
 
 #+end_src
 
 you will now have two commands available:
 
 #+begin_src emacs-lisp   :exports both
-my-do-buffer
+yk-do-buffer
 #+end_src
 
 this function will process the entire buffer.
@@ -128,24 +128,25 @@ this function will process the entire buffer.
 and 
 
 #+begin_src emacs-lisp   :exports both
-my-do-region
+yk-do-region
 #+end_src
 
 which will do only the current region.
 
 Both commands can be run on text that has been already processed.
 
-At this point you can then enter the my-minor-mode. This mode has the following commands:
+At this point you can then enter the yk-minor-mode. This mode has the following commands:
 
-| i | mark morph as ignored                |
-| k | mark morph as known                  |
-| l | mark morph as learning               |
-| u | mark morph as unknown                |
-| j | show morph in jisho.org              |
-| k | show kanji in kanjidamage.com        |
-| p | display properties of morph at point |
-| = | mark current sentence                |
-| x | exit minor mode                      |
+| i   | mark morph as ignored                |
+| k   | mark morph as known                  |
+| l   | mark morph as learning               |
+| u   | mark morph as unknown                |
+| j   | show morph in jisho.org              |
+| k   | show kanji in kanjidamage.com        |
+| p   | display properties of morph at point |
+| =   | mark current sentence                |
+| x   | exit minor mode                      |
+| RET | define term at point                 |
 
 * Limitations
 
