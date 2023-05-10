@@ -12,21 +12,45 @@
 (defvar   yk-tooltip-timeout 10)
 
 
+(defun yk-longest-line-len (str)
+  (let ((longest 0)
+        (start 0))
+    (while (string-match "\n" str start)
+      (let ((end (match-end 0))
+            (length (- (match-end 0) start 1) ) )
+        (message "current match [%s][%s]" end length)
+        (when (> length longest)
+          (setq longest length))
+        (setq start end))
+      )
+    (when (> (length str) start)
+      (let ((length (- (length str) start)))
+        (when (> length longest)
+          (setq longest length))))
+    longest))
+
+
 (defun yk-pad-first-line (st)
   "this function pads the first line to match the length of the second and an extra end of line" 
   (let*
       (
-       (from  (string-match "\n" st))
-       (pos2  (if from (string-match "\n" st (+ from 1)) nil))
-       (len (if pos2 (- pos2 1) nil))
+       (first-line-len (string-match "\n" st))
+       (max-len (yk-longest-line-len st))
+       (padding (if (> max-len first-line-len)
+                    (- max-len first-line-len)
+                  0))
+       (rest (substring st first-line-len))
        )
-    (if len
+    (message "st [%s] first [%s] max [%s] padding [%s]" st first-line-len max-len padding)
+    (if rest
         (format "%s%s\n%s\n"
-                (substring st 0 from)
-                (make-string len ?-)
-                (substring st from))
+                (substring st 0 first-line-len)
+                (make-string padding ?-)
+                rest)
       st
-      )))
+      )
+    
+    ))
 
 (defun yk-tip-show (msg)
   (pos-tip-show
@@ -49,7 +73,7 @@
 
 
 (defun yk-show-definition (term definition)
-  (dmg-jp-tip-show definition)
+  (yk-tip-show definition)
   (message definition)
   (get-buffer-create yk-tango-buffer-name)
   (with-current-buffer  yk-tango-buffer-name
