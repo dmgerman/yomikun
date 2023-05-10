@@ -107,7 +107,8 @@ You need to install [[https://github.com/magit/emacsql]].
 
 
 #+begin_src emacs-lisp   :exports both
-(require 'jp-token)
+(require 'yomikun)
+(require 'yomikun-dict)
 
 ;; replace with your path to mecab
 (setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
