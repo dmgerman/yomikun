@@ -1049,8 +1049,13 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (interactive)
     (let* ((pos (point))
            (props (text-properties-at pos))
+           (comp (and props;
+                      (nth 0 (plist-get props 'compound))))
            (term (and props
-                      (plist-get props 'root)
+                      (or
+                       comp
+                       (plist-get props 'root)
+                       )
                       ))
            )
       (if term
@@ -1070,6 +1075,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
            (term (my-extract-term-at-point))
            (definition (dmg-run-dictionary term))
            )
+      (message "term [%s]" term)
       (if (> (length definition) 0)
           (dmg-show-definition term definition)
                                         ; else
