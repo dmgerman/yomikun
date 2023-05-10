@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'popup)
 (require 'pos-tip)
 
@@ -31,7 +33,14 @@
 
 
 (defun yk-pad-first-line (st)
-  "this function pads the first line to match the length of the second and an extra end of line" 
+  "this function pads the first line to match the length of the longest line
+
+we need this because in osx the tooltips are as wide as the first line of text
+thus, it would truncate longer lines
+
+TODO: ideally, this should measure the width of the text, considering the
+typeface to be used and wide/narrow chars width.
+" 
   (let*
       (
        (first-line-len (string-match "\n" st))
