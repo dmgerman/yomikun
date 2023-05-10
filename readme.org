@@ -67,8 +67,10 @@ Features:
     3. type. the grammatical type of word
 - this module keeps track of the learned status of a word:
   - ignore: we don't care for it, i.e. names, or interjections)
+  - learning: we are trying to remember it 
   - known: the surface of the word (i.e. seen version of the root, eg. たベル vs 食べる) is known
-- if the morph is not in the db, it means it is unknown
+  - unknown: added to the db, but unknown
+  - if the morph is not in the db, it means it is unknown
 
 * how to use
 
