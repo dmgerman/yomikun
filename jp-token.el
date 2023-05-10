@@ -84,6 +84,21 @@
   
   )
 
+(setq my-compound-candidates-table (make-hash-table :test 'equal))
+
+(defun my-compound-prefix-candidates (st)
+  (or (gethash st my-compound-candidates-table)
+      (let
+          (
+           (comps (my-db-compound-prefix-candidates st))
+           )
+        (puthash st
+                 comps
+                 my-compound-candidates-table)        
+        )        
+      )
+  )
+
 (defun my-db-compound-prefix-candidates (st)
 ;;  (message "                 .searhing for candidates [%s]" st)
 
@@ -587,8 +602,8 @@ and call pfun on it"
     ;; return value
     (if compound
         (progn
-;;          (message "Found compound [%s] length [%d]" compound n)
-          (list compound n)      
+          (message "Found compound [%s] length [%d]" compound n)
+          (list compound (+ 1 n))      
           )
       nil
       )
@@ -602,10 +617,16 @@ and call pfun on it"
   ;; simplifies logic
   (setq lst (cons t lst))
   
-  (while (setq lst (cdr lst))
+  (let (
+        (not-done t)
+        )
+    (while (and
+            not-done
+            (setq lst (cdr lst)) ;; consume the list
+                )
       (let* (
              (candidates        (my-build-potential-candidates lst 2))
-             (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
+;             (surface-matches-p (my-db-compound-exists (nth 0 candidates)))
              (db-candidates     (my-db-compound-prefix-candidates (nth 1 candidates)))
              (compound          (and db-candidates
                                      (my-find-compound lst db-candidates) 
@@ -614,12 +635,16 @@ and call pfun on it"
 ;        (message "---------------matches %s" surface-matches-p)
 ;        (message "candidates %s" candidates)
 ;        (message "db exist %s" db-candidates)
-        (if compound
-            (message "Found match [%s]" compound)
+        (when compound
+;          (message "Found match [%s] [%s] len list [%d]" compound (nth 1 compound) (length lst))
+          (if (= (nth 1 compound) (length lst))
+              ;; no point on continuing
+              (setq not-done nil)
+              )
           )
         )
 ;      (setq lst (cdr lst))
-   )
+   ))
   )
 
 (defun my-find-compounds (beg end)
