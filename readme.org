@@ -27,9 +27,9 @@ Features:
   - token info
   - fontify accordingly
 - dictionary support using [[https://github.com/melissaboiko/myougiden][myougiden]]. This means Eng-Jp , Jp-Eng.
-  - overlaid (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]]--to be done)
+  - overlaid (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
   - keep a buffer with lookups
-- support for getting jumping to reference pages (e.g. [[https://jisho.org][jisho]], [[http://kanjidamage.com][kanjiDamage]])
+- support for jumping to reference pages (e.g. [[https://jisho.org][jisho]], [[http://kanjidamage.com][kanjiDamage]])
 
 [[./screenshot.png]]
 
@@ -43,6 +43,7 @@ Features:
     - mark known, unknown, ignored and learning words
 - [X] support to identify and lookup compound terms (terms created by combining two or more morphs)
 - [X] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
+- [ ] send sentence to deepl
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
 - [ ] make it async
@@ -300,4 +301,5 @@ Support via an external dictionary. Most likely [[https://github.com/melissaboik
   - [ ] add compounds of 3 kanji to db (eg: 形状詞)
   - [ ] fontify compounds
   - [ ] mark compounds of a region, rather than all buffer
+  - [ ] keep track of status of compounds
 - [ ] add dictionary lookup for region
