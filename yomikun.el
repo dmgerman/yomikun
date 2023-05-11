@@ -284,22 +284,28 @@ return match as a list or nil if not found
 
 
 (defface yk-face-unknown
-  '((t ( :background "LightYellow2"
+  '((t ( :background "misty rose"
                 )))
   "Face for default unknown text"
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-learning
-  '((t ( :background "PaleGreen1"
+  '((t ( :background "#EAFFEA"
          )))
   "Face for default learning text"
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-ignore
-  '((t ( :background "gray90"
+  '((t ( :background "gray95"
          )))
   "Face for default learning text"
-  :group 'my)
+  :group 'yomikun)
+
+(defface yk-face-compound
+  '((t ( :underline (:color red :style wave :position 3)
+         )))
+  "Face for default learning text"
+  :group 'yomikun)
 
 ;; for grammatical entities
 
@@ -316,7 +322,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "darkblue")))
   "Face for nouns alt."
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-verb
   '((t (:inherit font-lock-keyword-face
@@ -331,7 +337,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "darkgreen")))
   "Face for verbs."
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-adverb
   `((((class color) (background light))
@@ -339,7 +345,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "purple")))
   "Face for adverbs."
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-adjective
   `((((class color) (background light))
@@ -347,7 +353,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "orange")))
   "Face for adjectives."
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-particle
   `((((class color) (background light))
@@ -355,7 +361,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "darkgrey")))
   "Face for particles."
-  :group 'my)
+  :group 'yomikun)
 
 (defface yk-face-punctuation
   `((((class color) (background light))
@@ -363,7 +369,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "black")))
   "Face for particles."
-  :group 'my)
+  :group 'yomikun)
 
 ;; combined unknown and grammar point
 (defface yk-face-noun-unknown
@@ -467,9 +473,11 @@ return match as a list or nil if not found
                                        ("ignore" .   yk-face-ignore)
                                        ))
 
-(defun yk-font-table-to-use (status)
+(defun yk-font-table-wtype-to-use (status)
   "This is the core of the fontification.
    Depending on the status, return a given table.
+
+   For ignore, we don't fonti
 
    Defaults to the unknown table
 
@@ -477,6 +485,7 @@ return match as a list or nil if not found
   (cond 
    ((string-equal "known" status)     yk-wtype-table)
    ((string-equal "learning" status)  yk-wtype-table-status-learning)
+   ((string-equal "ignore" status)    nil)
    (yk-wtype-table-status-unknown)
    )
   )
@@ -697,17 +706,20 @@ return match as a list or nil if not found
   ;; this function is probably slower than it can be
   ;; but it not executed a lot
   (setq yk-compound-occurences (+ 1 yk-compound-occurences))
+
   (let*(
-       (beg (car (nth 0 lst)))
-       (end (car (nth 1 lst)))
+       (beg-compound (car (nth 0 lst)))
+       (end-token-pos   (car (nth 1 lst)) )
+       (end-compound (get-text-property end-token-pos 'end))
        (st  (nth 2 lst))
        )
-;    (message "beg [%s] end [%s] st [%s]" beg end st)
-    (dolist (pos (number-sequence beg (+ 1 end)))
+    (message "beg [%s] end [%s] st [%s] len [%d]" beg-compound end-compound st (length st))
+    (yk-set-overlay-compound-at-pos beg-compound end-compound)
+    (dolist (pos (number-sequence beg-compound end-compound))
       (let (
             (cur-prop (get-text-property pos 'compound))
             )
-;        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
+        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
         (put-text-property pos (+ 1 pos) 'compound (cons st cur-prop ))
         )
       )
@@ -720,10 +732,12 @@ return match as a list or nil if not found
          (p-tokens (yk-get-tokens-region beg end))
          (matches (yk-find-compound-matches p-tokens))
         )
-    ;;      (message "tokens [%s]" p-tokens)
+    (message "tokens [%s]" p-tokens)
+    (message "matches [%s]" matches)
     (when matches
+      ;; reset overlay for compound
       (remove-text-properties beg end '(compound nil ))
-                              
+      ;yk-face-compound          
 ;      (message "matches [%s]" matches)
       (mapc
        'yk-mark-as-compound
@@ -737,6 +751,7 @@ return match as a list or nil if not found
 (defun yk-do-all-compounds ()
   (interactive)
   (setq yk-compound-occurences 0)
+  (yk-morphs-delete-overlays-at-pos 'yomikun-comp (point-min) (point-max))
   (yk-db-dict-open)
   (with-silent-modifications 
     (yk-morph-do-phrases
@@ -779,28 +794,12 @@ and call pfun on it"
   
   )
 
-(defun yk-morphs-delete-overlays-at-pos (beg end)
-  "delete overlays between beg and end"
-  (dolist (overlay (overlays-in beg end))
-    (message "deleting... overlay [%s]" overlay)
-    (delete-overlay overlay))  
+(defun yk-morphs-delete-overlays-at-pos (name beg end)
+  "delete overlays between beg and end that have property name equal t"
+  (message "deleting... overlays name [%s:%s ][%s]" beg end name)
+  (remove-overlays beg end name t)
   )
 
-
-(defun yk-test-all ()
-  (interactive)
-
-  (let* ((pos (point))
-         (props (text-properties-at pos))
-         )
-    ;; process the morphs that match this one
-    ;; and replace the overlays
-    (yk-morph-do-morphs
-     (lambda (beg) (yk-morph-matches-at props beg  )););
-      )
-    'yk-morphs-delete-overlays-at-pos
-    )
-  )
 
 (defun yk-remove-props-and-overlays (beg end)
   (interactive "r")
@@ -817,7 +816,8 @@ and call pfun on it"
                                            end     nil
                                            status  nil
                                            ))
-    (remove-overlays beg end 'yk-name t)
+    (remove-overlays beg end 'yomikun t)
+    (remove-overlays beg end 'yomikun-comp t)
   )))
 
 (setq yk-test-all-morphs (make-hash-table :test 'equal));(list))
@@ -899,8 +899,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
   ;;  replace the overlays at the given position
   ;;  according to the new status
   ;;
-  (yk-morphs-delete-overlays-at-pos beg end)
-  (yk-set-overlay-at-pos beg end wtype newstatus)
+  (yk-set-overlay-wtype-at-pos beg end wtype newstatus )
 )
 
 
@@ -980,34 +979,49 @@ The list is sorted using COMPARE-FUNC to compare elements."
                                         ;  (and
 ;  (message "inside yk-wtype-status-to-face [%s][%s]" wtype status)
   (let* (
-        (font-table (yk-font-table-to-use status))
+        (font-table (yk-font-table-wtype-to-use status))
         (face (assoc wtype font-table))
         )
 ;    (message "inside let [%s]" face)
 ;    (message "table used [%s]" font-table)
     (if face
         (cdr face)
-      (assoc status yk-font-table-default-status)
+      ;; else
+      (let (
+            (face (cdr-safe (assoc status yk-font-table-default-status)))
+            )
+        (message "> no face for wtype. [%s] status [%s].. using [%s]" wtype status face)
+        face
         )
+      
+      )
     )   
   )
 
+(defun yk-set-overlay (name beg end face)
+  (let (
+        (ovl (make-overlay beg end));)
+        )
+    (overlay-put ovl 'font-lock-face face)
+    (overlay-put ovl 'yomikun t)
+    )
+  )
 
-(defun yk-set-overlay-at-pos (beg end wtype status)
+(defun yk-set-overlay-compound-at-pos (beg end)
+  (yk-set-overlay 'yomikun-comp beg end 'yk-face-compound) 
+  )
+
+(defun yk-set-overlay-wtype-at-pos (beg end wtype status)
+  (yk-morphs-delete-overlays-at-pos 'yomikun beg end)
   (let (
         (face (yk-wtype-status-to-face wtype status))
         )
-
     (if face
-        (let (
-              (ovl (make-overlay beg end));)
-              )
-          (overlay-put ovl 'font-lock-face face)
-          (overlay-put ovl 'yk-name t)
-          )
-        )
+        (yk-set-overlay 'yomikun beg end face)
+      )
     )
   )
+
 
 
 (defun yk-set-text-prop-token (token)
@@ -1023,7 +1037,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
 ;       (face (yk-wtype-status-to-face wtype status))
        )
-    (yk-set-overlay-at-pos beg end wtype status)
+    (yk-set-overlay-wtype-at-pos beg end wtype status)
     (if status
         (put-text-property beg end 'status status)
       )
