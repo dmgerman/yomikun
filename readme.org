@@ -13,6 +13,7 @@
 - [[#pitch-accent-to-be-done][pitch accent (to be done)]]
 - [[#dictionary-to-be-done][dictionary (to be done)]]
 - [[#current-bugstodos][current bugs/todos]]
+- [[#notes-to-myself][notes to myself]]
 
 * mode for reading japanese
 
@@ -48,7 +49,8 @@ Features:
 - [-] add info for N-levels (N5, N4 and N3 already done)
 - [ ] make it async
 - [X] local mode
-- [X] operate in regions    
+- [X] operate in regions
+- [x] automatically display "quick" definition when cursor-sensor-mode is enabled
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
 - [X] rename everything to something more meaningful
@@ -305,3 +307,20 @@ Support via an external dictionary. Most likely [[https://github.com/melissaboik
   - [ ] mark compounds of a region, rather than all buffer
   - [ ] keep track of status of compounds
 - [ ] add dictionary lookup for region
+
+* notes to myself
+
+#+begin_src sqlite
+select glosses.ent_seq, kanjis.frequent, gloss_id, kanji, reading, pos, gloss
+       from kanjis join entries using (ent_seq)  join glosses using (ent_seq) join senses using (sense_id) join readings using (ent_seq)
+       --where kanji = '雨'
+       ;
+#+end_src
+
+ #+begin_src sqlite   :exports both
+drop table if exists d.entries;
+create table d.entries as select distinct glosses.ent_seq, kanjis.frequent, gloss_id, kanji, reading, pos, gloss from kanjis join entries using (ent_seq)  join glosses using (ent_seq) join senses using (sense_id) join readings using (ent_seq) ;
+drop table if exists d.fentries;
+create table d.fentries as select * from d.entries join (select ent_seq, min(gloss_id) as gloss_id from d.entries group by ent_seq, kanji, reading, pos)  using (ent_seq, gloss_id);
+ #+end_src
+

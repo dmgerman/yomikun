@@ -94,14 +94,37 @@
                                               )])
   )
 
-(defun yk-db-dict-def (root pronun)
-  (emacsql yk-db-dict [:select [def pos rank]
-                                 :from dict
-                                 :where (and (= root $s1) (= pronun $s2) )
-                                 :order-by [(asc rank)]
-                                 ] root pronun) 
+(defun yk-db-dict-def (root pronun wtype)
+  ;; try to fin all markers... if not, match 
+  (let* (
+         ;; search first with wtype
+         (with-all (nth 0
+                          (emacsql yk-db-dict [:select [gloss pos root reading wtype]
+                                                       :from entries
+                                                       :where (and (= root $s1) (= reading $s2)
+                                                                   (= wtype $s3))
+                                                       :limit 1
+                                                       ] root pronun wtype) ))
+         ;; if not found search without it
+         (without-type (or with-all
+                   (nth 0
+                        (emacsql yk-db-dict [:select [gloss pos root reading wtype]
+                                                     :from entries
+                                                     :where (and (= root $s1) (= reading $s2) )
+                                                     :limit 1
+                                                     ] root pronun) )))
+         (result (or without-type
+                     (nth 0
+                          (emacsql yk-db-dict [:select [gloss pos root reading wtype]
+                                                       :from entries
+                                                       :where (= root $s1)
+                                                       :limit 1
+                                                       ] root ) )))
+         )
+    result
+    )
   
-  )
+   )
 
 ;; this is a memoization of the compounds queries
 ;; it does not seem to make an impact worth the memory it uses
@@ -155,13 +178,13 @@
 ;; currently unused
 (setq yk-dict-table (make-hash-table :test 'equal))
 
-(defun yk-dict-def (root pronun)
-  (or (gethash (list root pronun) yk-dict-table)
+(defun yk-dict-def (root pronun wtype)
+  (or (gethash (list root pronun wtype) yk-dict-table)
       (let
           (
-           (def (yk-db-dict-def root pronun))
+           (def (yk-db-dict-def root pronun wtype))
            )
-        (puthash (list root pronun)
+        (puthash (list root pronun wtype)
                  def
                  yk-dict-table)        
         )        
@@ -1037,10 +1060,16 @@ The list is sorted using COMPARE-FUNC to compare elements."
        (end (+ (plist-get token 'end) 1)) ;; ahh, it should 
 ;       (face (yk-wtype-status-to-face wtype status))
        )
+
     (yk-set-overlay-wtype-at-pos beg end wtype status)
-    (if status
-        (put-text-property beg end 'status status)
+    (when status
+      (put-text-property beg end 'status status)
+      (message ">>>>>>>>>status [%s]" status)
+      (when (string-equal status "unknown")
+        (put-text-property beg (+ 1 beg) 'cursor-sensor-functions (list #'yk-auto-help-at-point));
+        )
       )
+
     (put-text-property beg end 'begin beg)
     (put-text-property beg end 'end end)
     (put-text-property beg end 'wtype  wtype)
@@ -1048,11 +1077,9 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (put-text-property beg end 'surface surface)
     (put-text-property beg end 'yk-morph t)
     (put-text-property beg end 'seen seen)
-
-    ;; i prefer hiragana to katanana
+  ;; i prefer hiragana to katanana
     (put-text-property beg end 'pronun
                        (yk-katakana-to-hiragana (plist-get token 'pronun)))))
-
 
 (defun yk-process-wtype-p (token)
   (and
@@ -1110,6 +1137,34 @@ The list is sorted using COMPARE-FUNC to compare elements."
   (let* ((pos (point))
          (props (text-properties-at pos)))
     (message "Properties at position %d: %s" pos props)))
+
+(defun yk-quick-dict-at (pos)
+  (let* (
+         (props (text-properties-at pos))
+         (def  (yk-dict-def
+                (plist-get props 'root)
+                (plist-get props 'pronun)
+                (plist-get props 'wtype)
+                )
+               )
+         )
+    (message "%s %s" def props)))
+
+(defun yk-quick-dict-at-point ()
+  (interactive)
+  (yk-quick-dict-at (point))
+)
+
+
+(defun yk-auto-help-at-point (window oldpos dir)
+  (if (equal dir 'entered)
+;      (message "entering [%s] [%s] [%s] [%s]" window oldpos dir
+;               (text-properties-at oldpos)
+                                        ;               )
+      (yk-quick-dict-at (point))
+    )
+  
+)
 
 
 (defun yk-properties-at-point ()
@@ -1528,6 +1583,7 @@ Properties is a property-list with information about the
 (defun yk-disable-mode ()
   (interactive)
   (message "Exiting yk-minor-mode")
+  (cursor-sensor-mode -1)
   (yk-minor-mode -1)
   )
 
@@ -1548,7 +1604,9 @@ Properties is a property-list with information about the
   :global nil
   :lighter   "_yk_"    ; lighter
   :keymap yk-minor-map             ; keymap
-
+  :after-hook (progn
+                (cursor-sensor-mode -1)
+                )
   ;; this is where the code goes
   )
 
@@ -1579,3 +1637,4 @@ Properties is a property-list with information about the
   (setq patito32 (yk-mecab-command-on-buffer))
   )
 
+;;(setq inhibit-point-motion-hooks t)
