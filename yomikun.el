@@ -1148,7 +1148,11 @@ The list is sorted using COMPARE-FUNC to compare elements."
                 )
                )
          )
-    (message "%s %s" def props)))
+    (message "%s %s" def props)
+    (yk-tip-show (format "%s" def))
+    )
+  
+  )
 
 (defun yk-quick-dict-at-point ()
   (interactive)

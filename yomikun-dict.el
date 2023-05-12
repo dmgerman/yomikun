@@ -58,25 +58,32 @@ thus, it would truncate longer lines
 TODO: ideally, this should measure the width of the text, considering the
 typeface to be used and wide/narrow chars width.
 " 
-  (let*
-      (
-       (first-line-len (string-match "\n" st))
-       (max-len (yk-longest-line-len st))
-       (padding (if (> max-len first-line-len)
-                    (- max-len first-line-len)
-                  0))
-       (rest (substring st first-line-len))
-       )
-    (message "st [%s] first [%s] max [%s] padding [%s]" st first-line-len max-len padding)
-    (if rest
-        (format "%s%s\n%s\n"
-                (substring st 0 first-line-len)
-                (make-string padding ?-)
-                rest)
+  (let (
+        (first-line-len (string-match "\n" st))
+        )
+    (if first-line-len
+        (let*
+            (
+             (max-len (yk-longest-line-len st))
+             (padding (if (> max-len first-line-len)
+                          (- max-len first-line-len)
+                        0))
+             (rest (substring st first-line-len))
+             )
+;          (message "st [%s] first [%s] max [%s] padding [%s]" st first-line-len max-len padding)
+          (if rest
+              (format "%s%s\n%s\n"
+                      (substring st 0 first-line-len)
+                      (make-string padding ?-)
+                      rest)
+            st
+            )
+          )
+      ;; else: return it unchanged
       st
       )
-    
-    ))
+    )
+  )
 
 (defun yk-tip-show (msg)
   (pos-tip-show
