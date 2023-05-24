@@ -179,3 +179,4 @@ Keeps a log  of searched words in a transient buffer too"
     )
   )
              
+(provide 'yomikun-dict)

@@ -325,7 +325,7 @@ return match as a list or nil if not found
   :group 'yomikun)
 
 (defface yk-face-compound
-  '((t ( :underline (:color red :style wave :position 3)
+  '((t ( :underline (:color "red" :style wave :position 3)
          )))
   "Face for default learning text"
   :group 'yomikun)
@@ -1229,7 +1229,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
          )
     (yk-sync-list-to-st
      tokens
-     (buffer-substring beg end)
+     (buffer-substring-no-properties beg end)
      beg
      )
     ))
@@ -1414,7 +1414,7 @@ Properties is a property-list with information about the
   (setq process-adaptive-read-buffering t)
   (let* (
          (proc-buffer (yk-create-simple-buffer yk-process-buffer))
-        (temp-file (yk-create-temp-file-from-string (buffer-substring beg end)))
+        (temp-file (yk-create-temp-file-from-string (buffer-substring-no-properties beg end)))
         (process (start-process yk-process-name proc-buffer yk-mecab-command temp-file)
                  )
         )
@@ -1594,6 +1594,7 @@ Properties is a property-list with information about the
 (define-key yk-minor-map (kbd "=") 'yk-mark-sentence-at-point)
 (define-key yk-minor-map (kbd "p") 'yk-prop-at-point)
 (define-key yk-minor-map (kbd "i") 'yk-mark-at-point-as-ignored)
+(define-key yk-minor-map (kbd "u") 'yk-mark-at-point-as-unknown)
 (define-key yk-minor-map (kbd "k") 'yk-mark-at-point-as-known)
 (define-key yk-minor-map (kbd "l") 'yk-mark-at-point-as-learning)
 (define-key yk-minor-map (kbd "RET") 'yk-define-at-point)
@@ -1642,3 +1643,5 @@ Properties is a property-list with information about the
   )
 
 ;;(setq inhibit-point-motion-hooks t)
+
+(provide 'yomikun)
