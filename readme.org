@@ -158,6 +158,8 @@ Note. This might no longer be required in new versions of emacs.
   You can see its contents [[./other/m-mecab.sh][here]].
 - copy one of the status databases from [[./dbs/]] into your preferred location. The default location is ~/jp-status.db
 
+- copy and decompress the dictionary database ~/db/dictionary.db.bz2 to your preferred location. This database contains the quick definitions used in the
+  cursor-sensor-mode. It is much faster than looking up words in the dictionary.
 
 #+begin_src emacs-lisp   :exports both
 (require 'yomikun)
@@ -167,8 +169,8 @@ Note. This might no longer be required in new versions of emacs.
 (setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
 
 ;; replace with your preferred name and location. If the database does not exist, it will be created.
-(setq yk-status-db-file "~/jp-status.db")
-
+(setq yk-db-status-file "~/jp-status.db")
+(setq yk-db-dict-file "~/dictionary.db")
 #+end_src
 
 you will now have two commands available:
