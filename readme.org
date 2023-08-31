@@ -84,7 +84,31 @@ Features:
 
 This module relies primarily on mecab to parse japanese. In particular it uses mecab unidict.
 
-You must have a running installation of Unidict's mecab.  Make sure you get the following output (replace
+I think the easiest way is to download it from here: https://github.com/CrescentKohana/MecabUnidic/releases/tag/v1.2.1
+
+Download the corresponding binary and install. 
+
+Then create a script to run it from the command line using the corresponding
+files. I call this script m-mecab.sh
+
+Pay attention to the directory where the support files are installed. Make sure that the file mecab is executable.
+
+#+begin_src bash
+#!/usr/bin/env bash
+MDIR="/Users/dmg/bin/osx/MecabUnidic/support"
+export LD_LIBRARY_PATH="$MDIR":
+export DYLD_LIBRARY_PATH="$MDIR":
+#"$MDIR/mecab" -d $MDIR -h
+if [ "$1" == "" ] ; then
+    "$MDIR/mecab" -d $MDIR -r "$MDIR/mecabrc"
+else
+    "$MDIR/mecab" -d $MDIR -r "$MDIR/mecabrc" $*
+fi
+#unidic22
+#+end_src
+
+
+Make sure you get the following output (replace
 /Users/dmg/bin/osx/m-mecab.sh with the path to mecab in your installation). Note the number of columns. in the output:
 
 #+begin_src bash :results verbatim :exports both
