@@ -16,7 +16,7 @@
 
 
 
-
+(require 'pos-tip)
 (require 'emacsql)
 
 (defvar yk-mecab-command "echo" "Shell command to run on buffer contents")
