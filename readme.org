@@ -86,7 +86,7 @@ This module relies primarily on mecab to parse japanese. In particular it uses m
 
 I think the easiest way is to download it from here: https://github.com/CrescentKohana/MecabUnidic/releases/tag/v1.2.1
 
-Download the corresponding binary and install. 
+Download the corresponding binary and install. You should have a file support/matrix.bin that is 459Mbytes.
 
 Then create a script to run it from the command line using the corresponding
 files. I call this script m-mecab.sh
@@ -109,7 +109,7 @@ fi
 
 
 Make sure you get the following output (replace
-/Users/dmg/bin/osx/m-mecab.sh with the path to mecab in your installation). Note the number of columns. in the output:
+/Users/dmg/bin/osx/m-mecab.sh with the path to mecab in your installation). Note the number of columns in the output:
 
 #+begin_src bash :results verbatim :exports both
 echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh 
@@ -144,9 +144,11 @@ myougiden お願い
 
 These libraries can be installed using melpa
 
-**** emacsql 
+**** emacsql
 
 [[https://github.com/magit/emacsql]].
+
+Note. This might no longer be required in new versions of emacs.
 
 **** pos-tip
 
