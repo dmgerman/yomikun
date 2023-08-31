@@ -101,6 +101,20 @@ echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh
 EOS
 #+end_example
 
+*** myougiden (Japanese dictionary)
+
+- Install [[https://github.com/melissaboiko/myougiden][myougiden]]. this is done using pip. See its website. After running pip you need to download/install the dictionary.
+
+- make sure you can run it from the command line:
+
+#+begin_src bash :results verbatim
+myougiden お願い
+#+end_src
+
+#+RESULTS:
+#+begin_example
+おねがい	お願い；御願い	[n,vs,vt;pol] request|favour (to ask)|wish	[int] please (P)
+#+end_example
 
 *** emacs libraries
 
