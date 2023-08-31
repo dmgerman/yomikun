@@ -19,6 +19,8 @@
 
 An attempt to bring yomichan/migaku features to emacs.
 
+See a demo [[https://youtu.be/vOsyCawWjRc][here]].
+
 Features:
 
 - tokenize Japanese text

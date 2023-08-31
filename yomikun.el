@@ -1380,7 +1380,7 @@ Properties is a property-list with information about the
        (message "done processing processing tokens")
 
        )
-    (message "finished mecab processng %d tokens" (length jpTokens))
+    (message "finished mecab processing %d tokens" (length jpTokens))
 ;    (message "[%s]" jpTokens )
     ;; process the tokens
     (yk-process-tokens jpTokens)
@@ -1430,7 +1430,7 @@ Properties is a property-list with information about the
       (while (accept-process-output process))
       (message "mecab Done")
       (yk-process-mecab beg end proc-buffer)
-      (message "finisheb pressing buffer")
+      (message "finisheb processing buffer")
       (kill-buffer yk-process-buffer)
       (delete-file temp-file)
       )      
@@ -1486,7 +1486,7 @@ Properties is a property-list with information about the
       (
        (jpTokens (yk-process-filter beg end outputMecab))
        )
-    (message "finished mecab processng %d tokens" (length jpTokens))
+    (message "finished mecab processing %d tokens" (length jpTokens))
                                         ;    (message "[%s]" jpTokens )
     ;; process the tokens
     (yk-process-tokens jpTokens)
