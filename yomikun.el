@@ -1325,7 +1325,7 @@ Properties is a property-list with information about the
                   (let* (
                          ;; search from offset for the next token
                          ;; TODO: do not add a new token, it is not needed.
-                         ;;     simply advance the caracter being inspected
+                         ;;     simply advance the character being inspected
                          (skip (cl-search next (substring st offset))) ;; text that is skipped
                          ;;(newSeen (substring st offset (+ skip offset)))
                          ;;(endpos (+ position skip -1))
@@ -1348,7 +1348,7 @@ Properties is a property-list with information about the
           ))
         )
       ;; left over string... 
-      ;; but if there is text left, we dont' care for it
+      ;; but if there is text left, we don't care for it
       (nreverse output)
       )))
 
@@ -1373,7 +1373,7 @@ Properties is a property-list with information about the
                  )
                )
        (message "done processing raw mecab")
-       ;; save mecab ouptut, remove end-of-process message
+       ;; save mecab output, remove end-of-process message
        (outputMecab (substring output 0 (string-match yk-process-end-st output)))
        ;; separate tokens
        (jpTokens (yk-process-filter beg end outputMecab))
@@ -1430,7 +1430,7 @@ Properties is a property-list with information about the
       (while (accept-process-output process))
       (message "mecab Done")
       (yk-process-mecab beg end proc-buffer)
-      (message "finisheb processing buffer")
+      (message "finished processing buffer")
       (kill-buffer yk-process-buffer)
       (delete-file temp-file)
       )      
@@ -1459,7 +1459,7 @@ Properties is a property-list with information about the
       (while (accept-process-output process))
       (message "mecab Done")
       (yk-process-mecab beg end yk-process-buffer)
-      (message "finisheb pressing buffer")
+      (message "finished processing buffer")
       (kill-buffer yk-process-buffer)
       )      
     )
