@@ -41,7 +41,9 @@ Features:
 - dictionary support using [[https://github.com/melissaboiko/myougiden][myougiden]]. This means Eng-Jp , Jp-Eng.
   - overlaid (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
   - keep a buffer with lookups
+- information about kanji using [[https://github.com/neocl/jamdict][jamdict]]
 - support for jumping to reference pages (e.g. [[https://jisho.org][jisho]], [[http://kanjidamage.com][kanjiDamage]])
+
 
 [[./screenshot.png]]
 
