@@ -14,13 +14,13 @@
 
 ;;; Code:
 
-
 ;;;(require 'popup)
 (require 'pos-tip)
 
 ;; important to wrap %s with single quotes to avoid problems with
 ;; shell special characters. Single quotes are removed from term to be search for
 (defvar yk-dict-command "myougiden --human '%s'")
+(defvar yk-kanji-dict-command "kanji-dict.py '%s'")
 
 (defvar yk-tango-buffer-name "*yk-tango*")
 
@@ -110,6 +110,18 @@ typeface to be used and wide/narrow chars width.
     "no term given"
     ))
 
+(defun yk-run-kanji-dictionary (term)
+  ;; run kanji dictionary and return its output
+  ;; TODO probably needs error management...
+  
+  (if (> (length term) 0)
+      ;; replace single quotes as they would create errors
+      (shell-command-to-string (format  yk-kanji-dict-command
+                                        (replace-regexp-in-string "'" "" term)                                        
+                                        ))
+    "no term given"
+    ))
+
 
 (defun yk-show-definition (term definition)
   ;; show the definition:
@@ -155,9 +167,6 @@ typeface to be used and wide/narrow chars width.
     )
   )
                                         
-
-
-
 (defun yk-define-at-point ()
   "show definition of the morph under point in a tooltip and a message. If the text
 under the point is not a morph, extracts most meaningful option and asks user for
@@ -179,4 +188,27 @@ Keeps a log  of searched words in a transient buffer too"
     )
   )
              
+(defun yk-kanji-at-point ()
+  "show kanji information of the morph under point in a tooltip and a message. If the text
+under the point is not a morph, extracts most meaningful option and asks user for
+confirmation.
+
+Keeps a log  of searched words in a transient buffer too"
+  (interactive)
+  (save-excursion
+    (let* (
+           (term (yk-extract-term-at-point))
+           (definition (yk-run-kanji-dictionary term))
+           )
+      (if (> (length definition) 0)
+          (yk-show-definition term definition)
+        ;; else
+        (message (format "Term [%s] not found" term))
+        )
+      )
+    )
+  )
+
+
+
 (provide 'yomikun-dict)
