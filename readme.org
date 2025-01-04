@@ -1,4 +1,9 @@
 * Table of contents :toc:
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:ID:       id-20250103-231814
+:TRIGGER:  org-gtd-next-project-action org-gtd-update-project-task!
+:END:
 - [[#mode-for-reading-japanese][mode for reading japanese]]
 - [[#this-is-work-in-progress][This is work in progress.]]
 - [[#nomenclature][Nomenclature]]
@@ -12,10 +17,14 @@
 - [[#speed][speed]]
 - [[#pitch-accent-to-be-done][pitch accent (to be done)]]
 - [[#dictionary-to-be-done][dictionary (to be done)]]
+- [[#kanji-lookups][kanji lookups]]
 - [[#current-bugstodos][current bugs/todos]]
 - [[#notes-to-myself][notes to myself]]
 
 * mode for reading japanese
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 An attempt to bring yomichan/migaku features to emacs.
 
@@ -38,6 +47,9 @@ Features:
 
 
 * This is work in progress.
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - [X] tokenize and colour tokens by type
 - [X] typeset the text according to learning status (still to be completed)
@@ -61,6 +73,9 @@ Features:
 - [ ] keep track of known kanji?
 
 * Nomenclature
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - a Japanese text is composed of a sequence of tokens, some of them non-japanese.
 - mecab converts the input text into a sequence of tokens
@@ -77,10 +92,19 @@ Features:
   - if the morph is not in the db, it means it is unknown
 
 * how to use
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 ** requirements
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 *** mecab
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 This module relies primarily on mecab to parse japanese. In particular it uses mecab unidict.
 
@@ -126,6 +150,9 @@ EOS
 #+end_example
 
 *** myougiden (Japanese dictionary)
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - Install [[https://github.com/melissaboiko/myougiden][myougiden]]. this is done using pip. See its website. After running pip you need to download/install the dictionary.
 
@@ -141,18 +168,30 @@ myougiden お願い
 #+end_example
 
 *** emacs libraries
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 These libraries can be installed using melpa
 
 **** emacsql
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 [[https://github.com/magit/emacsql]].
 
 Note. This might no longer be required in new versions of emacs.
 
 **** pos-tip
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 ** installation
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - update the variable yk-command with the location of the mecab executable. In my case it is a script that setup the proper resources used by mecab.
   You can see its contents [[./other/m-mecab.sh][here]].
@@ -205,12 +244,18 @@ At this point you can then enter the yk-minor-mode. This mode has the following 
 | RET | define term at point                 |
 
 * Limitations
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - work in progress.
 - Tested only in macos but it should work without problems in linux
 - Processing of large text can take few seconds. For example Alice in Wonderland takes 8 seconds to process on an M1 mini.
  
 * status database
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 The status database is a sqlite database created and managed by emacsql. This means that all attributes are surrounded by double quotes.
 
@@ -229,6 +274,9 @@ The primary key is (morph, mtype, surface)
 there are databases with different JLPT levels at [[./dbs/]]
 
 * mecab parsing
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 From each sentence we obtain the root, the type of word, and the surface (kanji/hiragana version seen). For example:
 
@@ -309,10 +357,16 @@ echo "美味しい寿司を食べた。おいしくないすしはたべられ�
 | 形容詞  | 美味しい | 美味しい  |
 
 * compound terms
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 to be written...
 
 * speed
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in around 8 seconds in an M1 mini.
 
@@ -326,6 +380,9 @@ Finding compounds is optional. It is a CPU intensive process. Processing of Alic
 approximately 10 seconds.
 
 * pitch accent (to be done)
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 to be done...
 
@@ -339,10 +396,61 @@ https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
 #+end_src
 
 * dictionary (to be done)
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
 
+
+* kanji lookups
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
+
+I have added a command to display information about a kanji called
+kanji-dict.py
+
+[[./other/kanji/]]
+
+See yk-kanji-dict-command in yomikun-dict.el
+
+This program needs the database created by jamdict. You need to install it
+https://github.com/neocl/jamdict
+
+Once installed, run:
+
+#+begin_src sh   :exports both
+python3 -m jamdict info
+#+end_src
+
+and record the Jamdict DB location. Change kanji-dict.py location of the database
+to this path.
+
+This is an example of the expected output:
+
+#+begin_example
+~/bin/kanji-dict.py 日本   
+日 Strokes: 4 Grade: 1 Freq: 1 JLPT: 4
+    day    sun    Japan    counter for days
+       ja_kun: ひ
+       ja_kun: -び
+       ja_kun: -か
+       ja_on: ニチ
+       ja_on: ジツ
+本 Strokes: 5 Grade: 1 Freq: 10 JLPT: 4
+    book    present    main    origin    true    real    counter for long cylindrical things
+       ja_kun: もと
+       ja_on: ホン
+
+Done.
+#+end_example
+
+
 * current bugs/todos
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 - [ ] ignore fontification is not working
 - [ ] compounds
@@ -353,6 +461,9 @@ Support via an external dictionary. Most likely [[https://github.com/melissaboik
 - [ ] add dictionary lookup for region
 
 * notes to myself
+:PROPERTIES:
+:CREATED:  2025-01-03 23:18:14
+:END:
 
 #+begin_src sqlite
 select glosses.ent_seq, kanjis.frequent, gloss_id, kanji, reading, pos, gloss
