@@ -5,6 +5,9 @@ import os
 import sys
 import regex as re
 
+# change this to the location of jamdict.db
+fileDb = "/opt/homebrew/anaconda3/lib/python3.11/site-packages/jamdict_data/jamdict.db"
+
 
 if len(sys.argv) != 2:
     print("Usage: python script.py <kanji>")
@@ -26,7 +29,6 @@ def IsKatakana(w):
 
 
 st = sys.argv[1]
-fileDb = "/opt/homebrew/anaconda3/lib/python3.11/site-packages/jamdict_data/jamdict.db"
 
 if not os.path.exists(fileDb):
     print(f"Database file {fileDb} does not exist.")
