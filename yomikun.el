@@ -341,15 +341,17 @@ return match as a list or nil if not found
 
 (defface yk-face-noun-alt
   `((((class color) (background light))
-     (:foreground  "darkblue"))
+     (:foreground  "dark blue"))
     (((class color) (background dark))
-     (:foreground  "darkblue")))
+     (:foreground  "dark blue")))
   "Face for nouns alt."
   :group 'yomikun)
 
 (defface yk-face-verb
-  '((t (:inherit font-lock-keyword-face
-                 )))
+  `((((class color) (background light))
+     (:foreground  "SteelBlue3"))
+    (((class color) (background dark))
+     (:foreground  "blue")))
   "Face for verb"
   :group 'my
   )
@@ -733,7 +735,7 @@ return match as a list or nil if not found
   (let*(
        (beg-compound (car (nth 0 lst)))
        (end-token-pos   (car (nth 1 lst)) )
-       (end-compound (get-text-property end-token-pos 'end))
+       (end-compound    (+ (get-text-property end-token-pos 'end) -1))
        (st  (nth 2 lst))
        )
     (message "beg [%s] end [%s] st [%s] len [%d]" beg-compound end-compound st (length st))
@@ -1600,6 +1602,7 @@ Properties is a property-list with information about the
 (define-key yk-minor-map (kbd "RET") 'yk-define-at-point)
 (define-key yk-minor-map (kbd "t") 'yk-extract-term-at-point)
 (define-key yk-minor-map (kbd "j") 'yk-jisho-at-point)
+(define-key yk-minor-map (kbd "n") 'yk-kanji-at-point)
 (define-key yk-minor-map (kbd "m") 'yk-kanji-damage-at-point)
 (define-key yk-minor-map (kbd "x") 'yk-disable-mode)
 
