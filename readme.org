@@ -5,7 +5,7 @@
 :TRIGGER:  org-gtd-next-project-action org-gtd-update-project-task!
 :END:
 - [[#mode-for-reading-japanese][mode for reading japanese]]
-- [[#this-is-work-in-progress][This is work in progress.]]
+- [[#completed-features][completed features]]
 - [[#nomenclature][Nomenclature]]
 - [[#how-to-use][how to use]]
   - [[#requirements][requirements]]
@@ -16,7 +16,6 @@
 - [[#compound-terms][compound terms]]
 - [[#speed][speed]]
 - [[#pitch-accent-to-be-done][pitch accent (to be done)]]
-- [[#dictionary-to-be-done][dictionary (to be done)]]
 - [[#kanji-lookups][kanji lookups]]
 - [[#current-bugstodos][current bugs/todos]]
 - [[#notes-to-myself][notes to myself]]
@@ -48,10 +47,13 @@ Features:
 [[./screenshot.png]]
 
 
-* This is work in progress.
+* completed features
 :PROPERTIES:
 :CREATED:  2025-01-03 23:18:14
 :END:
+
+I have been using Yomikun to read japanese for several months. It is usable and mostly complete.
+
 
 - [X] tokenize and colour tokens by type
 - [X] typeset the text according to learning status (still to be completed)
@@ -60,19 +62,18 @@ Features:
     - mark known, unknown, ignored and learning words
 - [X] support to identify and lookup compound terms (terms created by combining two or more morphs)
 - [X] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
-- [ ] send sentence to deepl
+- [X] kanji lookups  
 - [ ] support pitch accent
 - [-] add info for N-levels (N5, N4 and N3 already done)
-- [ ] make it async
+- [ ] make it async. Though it seems to be fast enough for a typical document.
 - [X] local mode
 - [X] operate in regions
 - [x] automatically display "quick" definition when cursor-sensor-mode is enabled
 - [ ] create reports of "readability"
 - [ ] support for morphman and anki  
 - [X] rename everything to something more meaningful
-- [ ] remove unnecessary code
-- [ ] reorganize code  
 - [ ] keep track of known kanji?
+- [ ] cleanup and reorganize code  
 
 * Nomenclature
 :PROPERTIES:
@@ -396,14 +397,6 @@ https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
     acclen = len(e.ac)
     accent = "0"*(strlen-acclen) + e.ac
 #+end_src
-
-* dictionary (to be done)
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-Support via an external dictionary. Most likely [[https://github.com/melissaboiko/myougiden][myougiden]]
-
 
 * kanji lookups
 :PROPERTIES:

@@ -1236,27 +1236,40 @@ The list is sorted using COMPARE-FUNC to compare elements."
      )
     ))
 
+(defun yk-process-root-for-kana (morph)
+  "When the morph is a Kana word, mecab returns the word and
+its romagi equivalent. For example: the root of ドーム
+is ドーム-dome. This function removes the romagi if it exists"
+  (if (and morph (cl-position ?- morph))
+      ;; if we have a morph with -
+    (let* (
+           (pos  (cl-position ?- morph))
+           (romagi (and pos (substring morph (+ 1 pos)))))
+      (if (and romagi (string-match-p "^[a-zA-Z]+$"romagi ) )
+          (substring morph 0 pos) ;; kana part
+        morph)) ;; else of if
+    morph)) ;; else of if
 
 (defun yk-mecab-process-line (line)
   "maps a mecab output line into a pair (surface properties)
 Properties is a property-list with information about the 
 "
-(let* (
+  (let* (
        (textpair (and line (split-string line "\t")))
        (seen     (nth 0 textpair))
        (info     (nth 1 textpair))
        (infolist (and info (split-string info ",")))
        (wtype   (and infolist (nth 0 infolist)))
        (root    (and infolist (nth 7 infolist)))
+       (root-clean (yk-process-root-for-kana root))
        (pronun  (and infolist (nth 9 infolist)))
        (surface (and infolist (nth 10 infolist)))
        )
   (progn
-                                        
     (if (string-equal "EOS" seen)  ; EOS is a line end
         (setq seen "\n"))
 ;    (message "Line [%s] surface [%s]" line surface)
-    (list 'seen seen 'surface surface 'wtype wtype 'root root 'pronun pronun)
+    (list 'seen seen 'surface surface 'wtype wtype 'root root-clean 'pronun pronun)
     ))
 )
 
