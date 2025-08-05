@@ -56,7 +56,7 @@
       )
     ;; only open it if it is not open
     (when (not yk-db-status)
-     (setq yk-db-status (emacsql-sqlite yk-db-status-file)))
+     (setq yk-db-status (emacsql-sqlite-open yk-db-status-file)))
     )
 
 (defun yk-db-dict-open ()
@@ -66,7 +66,7 @@
     )
   ;; only open it if it is not open
   (when (not yk-db-dict)
-    (setq yk-db-dict (emacsql-sqlite yk-db-dict-file)))
+    (setq yk-db-dict (emacsql-sqlite-open yk-db-dict-file)))
   )
 
 (defun yk-db-dict-close ()
@@ -88,7 +88,7 @@
   (when (file-exists-p yk-db-status-file) 
     (signal 'file-error (format "the file already exist [%s]" yk-db-status-file))
     )
-  (setq yk-db-status (emacsql-sqlite yk-db-status-file))
+  (setq yk-db-status (emacsql-sqlite-open yk-db-status-file))
   (emacsql yk-db-status [:create-table words ([morph mtype surface status date]
                                               (:primary-key [morph mtype surface])
                                               )])
