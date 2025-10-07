@@ -25,6 +25,12 @@
 ;; string used by emacs to delimit end of process
 (defvar yk-process-end-st "\nProcess")
 
+(defvar yk-debug nil "Enable debug messages when non-nil")
+
+(defmacro yk-debug-message (format-string &rest args)
+  "Print debug message if yk-debug is non-nil."
+  `(when yk-debug
+     (message ,format-string ,@args)))
 
 (defvar yk-db-status-file "~/yk-status.db")
 (defvar yk-db-dict-file nil) 
@@ -738,13 +744,13 @@ return match as a list or nil if not found
        (end-compound    (+ (get-text-property end-token-pos 'end) -1))
        (st  (nth 2 lst))
        )
-    (message "beg [%s] end [%s] st [%s] len [%d]" beg-compound end-compound st (length st))
+    (yk-debug-message "beg [%s] end [%s] st [%s] len [%d]" beg-compound end-compound st (length st))
     (yk-set-overlay-compound-at-pos beg-compound end-compound)
     (dolist (pos (number-sequence beg-compound end-compound))
       (let (
             (cur-prop (get-text-property pos 'compound))
             )
-        (message "setting [%d] with [%s] current [%s]" pos st cur-prop)
+        (yk-debug-message "setting [%d] with [%s] current [%s]" pos st cur-prop)
         (put-text-property pos (+ 1 pos) 'compound (cons st cur-prop ))
         )
       )
@@ -757,8 +763,8 @@ return match as a list or nil if not found
          (p-tokens (yk-get-tokens-region beg end))
          (matches (yk-find-compound-matches p-tokens))
         )
-    (message "tokens [%s]" p-tokens)
-    (message "matches [%s]" matches)
+    (yk-debug-message "tokens [%s]" p-tokens)
+    (yk-debug-message "matches [%s]" matches)
     (when matches
       ;; reset overlay for compound
       (remove-text-properties beg end '(compound nil ))
@@ -821,7 +827,7 @@ and call pfun on it"
 
 (defun yk-morphs-delete-overlays-at-pos (name beg end)
   "delete overlays between beg and end that have property name equal t"
-  (message "deleting... overlays name [%s:%s ][%s]" beg end name)
+  (yk-debug-message "deleting... overlays name [%s:%s ][%s]" beg end name)
   (remove-overlays beg end name t)
   )
 
@@ -889,14 +895,14 @@ The list is sorted using COMPARE-FUNC to compare elements."
             (props (text-properties-at beg))
             (morph (yk-morph-get-morph-from-props props))
             )
-         (message "%s" props)
+         (yk-debug-message "%s" props)
          ;; increase their counter by 1
          (puthash morph
                   (+ (gethash morph all-morphs 0) 1)
                   all-morphs)
          ))
      )
-;    (message "[%s]" all-morphs)
+;    (yk-debug-message "[%s]" all-morphs)
     (yk-sort-hash-table all-morphs
                         (lambda (a b) (> (cdr a) (cdr b)))
                         )
@@ -1066,7 +1072,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (yk-set-overlay-wtype-at-pos beg end wtype status)
     (when status
       (put-text-property beg end 'status status)
-      (message ">>>>>>>>>status [%s]" status)
+      (yk-debug-message ">>>>>>>>>status [%s]" status)
       (when (string-equal status "unknown")
         (put-text-property beg (+ 1 beg) 'cursor-sensor-functions (list #'yk-auto-help-at-point));
         )
@@ -1127,9 +1133,9 @@ The list is sorted using COMPARE-FUNC to compare elements."
         )
       (when (or (not term )
                 (string-equal term ""))
-        (error "no term found or provided")          
+        (error "no term found or provided")
         )
-      (message "[%s]" term)
+      (yk-debug-message "[%s]" term)
       term
       )
     )
@@ -1150,7 +1156,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
                 )
                )
          )
-    (message "%s %s" def props)
+    (yk-debug-message "%s %s" def props)
     (yk-tip-show (format "%s" def))
     )
   
@@ -1224,7 +1230,7 @@ The list is sorted using COMPARE-FUNC to compare elements."
 
 (defun yk-process-filter (beg end output)
   "Process OUTPUT from mecab one line at a time using jp-process."
-  (message "Starting [%s]" (yk-until-eoln output))
+  (yk-debug-message "Starting [%s]" (yk-until-eoln output))
   (let* (
          (lines (split-string output "\n" t))
          (tokens  (mapcar #'yk-mecab-process-line lines))         ;
@@ -1296,8 +1302,8 @@ Properties is a property-list with information about the
   they occur.
 
 "
-  (message "entering [%s]" (yk-until-eoln st))
-  (message "%s " (car lst))
+  (yk-debug-message "entering [%s]" (yk-until-eoln st))
+  (yk-debug-message "%s " (car lst))
   (let (
         (output (list))
         (counter 0)
@@ -1387,15 +1393,15 @@ Properties is a property-list with information about the
                    (buffer-substring-no-properties (point-min) (point-max)))
                  )
                )
-       (message "done processing raw mecab")
+       (yk-debug-message "done processing raw mecab")
        ;; save mecab output, remove end-of-process message
        (outputMecab (substring output 0 (string-match yk-process-end-st output)))
        ;; separate tokens
        (jpTokens (yk-process-filter beg end outputMecab))
-       (message "done processing processing tokens")
+       (yk-debug-message "done processing processing tokens")
 
        )
-    (message "finished mecab processing %d tokens" (length jpTokens))
+    (yk-debug-message "finished mecab processing %d tokens" (length jpTokens))
 ;    (message "[%s]" jpTokens )
     ;; process the tokens
     (yk-process-tokens jpTokens)
@@ -1436,16 +1442,16 @@ Properties is a property-list with information about the
     (progn
       ;; async input is buffered and we do not want to process
       ;; incomplete lines. So wait until all output is created and process it
-      (message "created temp file [%s]" temp-file)
-      (message "process starting")
+      (yk-debug-message "created temp file [%s]" temp-file)
+      (yk-debug-message "process starting")
 
 ;      (process-send-region process beg end)
       (process-send-eof process)
-      (message "process sent")
+      (yk-debug-message "process sent")
       (while (accept-process-output process))
-      (message "mecab Done")
+      (yk-debug-message "mecab Done")
       (yk-process-mecab beg end proc-buffer)
-      (message "finished processing buffer")
+      (yk-debug-message "finished processing buffer")
       (kill-buffer yk-process-buffer)
       (delete-file temp-file)
       )      
@@ -1462,7 +1468,7 @@ Properties is a property-list with information about the
       ;; async input is buffered and we do not want to process
       ;; incomplete lines. So wait until all output is created and process it
       (setq process-adaptive-read-buffering t)
-      (message "process starting")
+      (yk-debug-message "process starting")
                                         ;      (with-current-buffer yk-process-buffer
                                         ;        (mapc (lambda (x) (funcall x -1))
                                         ;              (yk-active-minor-modes))
@@ -1470,11 +1476,11 @@ Properties is a property-list with information about the
 
       (process-send-region process beg end)
       (process-send-eof process)
-      (message "process sent")
+      (yk-debug-message "process sent")
       (while (accept-process-output process))
-      (message "mecab Done")
+      (yk-debug-message "mecab Done")
       (yk-process-mecab beg end yk-process-buffer)
-      (message "finished processing buffer")
+      (yk-debug-message "finished processing buffer")
       (kill-buffer yk-process-buffer)
       )      
     )
@@ -1501,7 +1507,7 @@ Properties is a property-list with information about the
       (
        (jpTokens (yk-process-filter beg end outputMecab))
        )
-    (message "finished mecab processing %d tokens" (length jpTokens))
+    (yk-debug-message "finished mecab processing %d tokens" (length jpTokens))
                                         ;    (message "[%s]" jpTokens )
     ;; process the tokens
     (yk-process-tokens jpTokens)
@@ -1533,12 +1539,12 @@ Properties is a property-list with information about the
       
       )
     (defun yk-sentinel (process event)
-      (message "Process: [%s] had event [%s]" process event)
+      (yk-debug-message "Process: [%s] had event [%s]" process event)
       (setq mecabOutput
             (mapconcat 'identity (reverse output) "")
             )
       (yk-process-mecab-output beg end mecabOutput)
-      (message "finally finishing with length of output [%d] " (length output))
+      (yk-debug-message "finally finishing with length of output [%d] " (length output))
       )
     (process-send-region process beg end)
     (process-send-eof process)
