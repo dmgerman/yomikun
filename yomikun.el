@@ -18,6 +18,7 @@
 
 (require 'pos-tip)
 (require 'emacsql)
+(require 'cl-lib)
 
 (defvar yk-mecab-command "echo" "Shell command to run on buffer contents")
 (defvar yk-process-name "jp-process")
@@ -589,7 +590,7 @@ return match as a list or nil if not found
              (prefix  (string-join
                        ;; use seen  to build prefix
                        (mapcar (lambda (el) (nth 2 el))
-                               (subseq lst 0 (- len 1)))
+                               (cl-subseq lst 0 (- len 1)))
                        ""
                        )
                       )
@@ -1251,7 +1252,7 @@ is ドーム-dome. This function removes the romagi if it exists"
     (let* (
            (pos  (cl-position ?- morph))
            (romagi (and pos (substring morph (+ 1 pos)))))
-      (if (and romagi (string-match-p "^[a-zA-Z]+$"romagi ) )
+      (if (and romagi (string-match-p "^[a-zA-Z]+$" romagi))
           (substring morph 0 pos) ;; kana part
         morph)) ;; else of if
     morph)) ;; else of if
