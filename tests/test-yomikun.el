@@ -666,4 +666,181 @@ Returns the buffer. Caller must kill it."
       (goto-char 1)
       (expect (yk-properties-at-point) :to-be nil))))
 
+;;; --- Mark-at-point functions ---
+
+(describe "yk-mark-at-point-as-known"
+  :var (temp-db saved-status-file saved-db-status)
+
+  (before-each
+    (setq saved-status-file yk-db-status-file)
+    (setq saved-db-status yk-db-status)
+    (setq temp-db (make-temp-file "yomikun-test-" nil ".db"))
+    (delete-file temp-db)
+    (setq yk-db-status-file temp-db)
+    (setq yk-db-status nil)
+    (yk-db-status-create)
+    (clrhash yk-status-table))
+
+  (after-each
+    (yk-db-status-close)
+    (when (file-exists-p temp-db) (delete-file temp-db))
+    (setq yk-db-status-file saved-status-file)
+    (setq yk-db-status saved-db-status)
+    (clrhash yk-status-table))
+
+  (it "updates status to known in DB"
+    (with-temp-buffer
+      (insert "猫が")
+      (with-silent-modifications
+        (put-text-property 1 2 'root "猫")
+        (put-text-property 1 2 'wtype "名詞")
+        (put-text-property 1 2 'surface "猫")
+        (put-text-property 1 2 'status "unknown")
+        (put-text-property 1 2 'begin 1)
+        (put-text-property 1 2 'yk-morph t)
+        (yk-set-overlay 'yomikun 1 2 'yk-face-noun-unknown)
+        (put-text-property 2 3 'begin 2)
+        (put-text-property 2 3 'yk-morph t))
+      (goto-char 1)
+      (yk-mark-at-point-as-known)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "known")))
+
+  (it "does nothing when not on a morph"
+    (with-temp-buffer
+      (insert "hello")
+      (goto-char 1)
+      (spy-on 'yk-morph-new-status)
+      (yk-mark-at-point-as-known)
+      (expect 'yk-morph-new-status :not :to-have-been-called))))
+
+(describe "yk-mark-at-point-as-learning"
+  :var (temp-db saved-status-file saved-db-status)
+
+  (before-each
+    (setq saved-status-file yk-db-status-file)
+    (setq saved-db-status yk-db-status)
+    (setq temp-db (make-temp-file "yomikun-test-" nil ".db"))
+    (delete-file temp-db)
+    (setq yk-db-status-file temp-db)
+    (setq yk-db-status nil)
+    (yk-db-status-create)
+    (clrhash yk-status-table))
+
+  (after-each
+    (yk-db-status-close)
+    (when (file-exists-p temp-db) (delete-file temp-db))
+    (setq yk-db-status-file saved-status-file)
+    (setq yk-db-status saved-db-status)
+    (clrhash yk-status-table))
+
+  (it "updates status to learning in DB"
+    (with-temp-buffer
+      (insert "猫が")
+      (with-silent-modifications
+        (put-text-property 1 2 'root "猫")
+        (put-text-property 1 2 'wtype "名詞")
+        (put-text-property 1 2 'surface "猫")
+        (put-text-property 1 2 'status "unknown")
+        (put-text-property 1 2 'begin 1)
+        (put-text-property 1 2 'yk-morph t)
+        (put-text-property 2 3 'begin 2)
+        (put-text-property 2 3 'yk-morph t))
+      (goto-char 1)
+      (yk-mark-at-point-as-learning)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "learning"))))
+
+(describe "yk-mark-at-point-as-ignored"
+  :var (temp-db saved-status-file saved-db-status)
+
+  (before-each
+    (setq saved-status-file yk-db-status-file)
+    (setq saved-db-status yk-db-status)
+    (setq temp-db (make-temp-file "yomikun-test-" nil ".db"))
+    (delete-file temp-db)
+    (setq yk-db-status-file temp-db)
+    (setq yk-db-status nil)
+    (yk-db-status-create)
+    (clrhash yk-status-table))
+
+  (after-each
+    (yk-db-status-close)
+    (when (file-exists-p temp-db) (delete-file temp-db))
+    (setq yk-db-status-file saved-status-file)
+    (setq yk-db-status saved-db-status)
+    (clrhash yk-status-table))
+
+  (it "updates status to ignore in DB"
+    (with-temp-buffer
+      (insert "猫が")
+      (with-silent-modifications
+        (put-text-property 1 2 'root "猫")
+        (put-text-property 1 2 'wtype "名詞")
+        (put-text-property 1 2 'surface "猫")
+        (put-text-property 1 2 'status "unknown")
+        (put-text-property 1 2 'begin 1)
+        (put-text-property 1 2 'yk-morph t)
+        (put-text-property 2 3 'begin 2)
+        (put-text-property 2 3 'yk-morph t))
+      (goto-char 1)
+      (yk-mark-at-point-as-ignored)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "ignore"))))
+
+;;; --- yk-quick-dict-at / yk-auto-help-at-point ---
+
+(describe "yk-quick-dict-at"
+  (before-each
+    (spy-on 'yk-tip-show))
+
+  (it "shows tooltip when dict DB is available and root exists"
+    (let ((yk-db-dict 'mock-connection))
+      (spy-on 'yk-dict-def :and-return-value '("cat" "noun" "猫" "ねこ" "名詞"))
+      (with-temp-buffer
+        (insert "猫")
+        (with-silent-modifications
+          (put-text-property 1 2 'root "猫")
+          (put-text-property 1 2 'pronun "ねこ")
+          (put-text-property 1 2 'wtype "名詞"))
+        (yk-quick-dict-at 1)
+        (expect 'yk-tip-show :to-have-been-called))))
+
+  (it "does nothing when dict DB is not connected"
+    (let ((yk-db-dict nil))
+      (with-temp-buffer
+        (insert "猫")
+        (with-silent-modifications
+          (put-text-property 1 2 'root "猫"))
+        (yk-quick-dict-at 1)
+        (expect 'yk-tip-show :not :to-have-been-called))))
+
+  (it "does nothing when no root at position"
+    (let ((yk-db-dict 'mock-connection))
+      (with-temp-buffer
+        (insert "hello")
+        (yk-quick-dict-at 1)
+        (expect 'yk-tip-show :not :to-have-been-called))))
+
+  (it "does nothing when dict-def returns nil"
+    (let ((yk-db-dict 'mock-connection))
+      (spy-on 'yk-dict-def :and-return-value nil)
+      (with-temp-buffer
+        (insert "猫")
+        (with-silent-modifications
+          (put-text-property 1 2 'root "猫")
+          (put-text-property 1 2 'pronun "ねこ")
+          (put-text-property 1 2 'wtype "名詞"))
+        (yk-quick-dict-at 1)
+        (expect 'yk-tip-show :not :to-have-been-called)))))
+
+(describe "yk-auto-help-at-point"
+  (before-each
+    (spy-on 'yk-quick-dict-at))
+
+  (it "calls yk-quick-dict-at on cursor entry"
+    (yk-auto-help-at-point nil nil 'entered)
+    (expect 'yk-quick-dict-at :to-have-been-called))
+
+  (it "does nothing on cursor exit"
+    (yk-auto-help-at-point nil nil 'left)
+    (expect 'yk-quick-dict-at :not :to-have-been-called)))
+
 ;;; test-yomikun.el ends here

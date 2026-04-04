@@ -58,10 +58,13 @@ so shorter first lines would truncate longer subsequent lines."
       str)))
 
 (defun yk-tip-show (msg)
-  "Display MSG in a tooltip near point."
-  (pos-tip-show (yk-pad-first-line msg)
-                nil nil nil
-                yk-tooltip-timeout))
+  "Display MSG in a tooltip near point.
+Catches errors from pos-tip to avoid breaking cursor-sensor callbacks."
+  (condition-case err
+      (pos-tip-show (yk-pad-first-line msg)
+                    nil nil nil
+                    yk-tooltip-timeout)
+    (error (message "Yomikun: %s" (or msg "")))))
 
 ;;; --- External Command Runner ---
 
@@ -69,6 +72,11 @@ so shorter first lines would truncate longer subsequent lines."
   "Run COMMAND with TERM appended as final argument.
 COMMAND is a list of (program arg1 arg2 ...).
 Returns the command output as a string."
+  (when (stringp command)
+    (error "Yomikun: `yk-dict-command' and `yk-kanji-dict-command' must be \
+lists, not strings.  Change \"%s\" to %s"
+           command
+           (format "'(%s)" (mapconcat #'identity (split-string command) " "))))
   (if (and term (> (length term) 0))
       (let ((program (car command)))
         (unless (executable-find program)

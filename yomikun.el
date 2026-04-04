@@ -860,20 +860,16 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (message "Properties at position %d: %s" pos props)))
 
 (defun yk-quick-dict-at (pos)
-  (let* (
-         (props (text-properties-at pos))
-         (def  (yk-dict-def
-                (plist-get props 'root)
-                (plist-get props 'pronun)
-                (plist-get props 'wtype)
-                )
-               )
-         )
-    (yk-debug-message "%s %s" def props)
-    (yk-tip-show (format "%s" def))
-    )
-  
-  )
+  "Show a quick dictionary tooltip for the morph at POS."
+  (when yk-db-dict
+    (let* ((props (text-properties-at pos))
+           (root (plist-get props 'root)))
+      (when root
+        (let ((def (yk-dict-def root
+                                (plist-get props 'pronun)
+                                (plist-get props 'wtype))))
+          (when def
+            (yk-tip-show (format "%s" def))))))))
 
 (defun yk-quick-dict-at-point ()
   (interactive)
