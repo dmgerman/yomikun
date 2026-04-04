@@ -1,476 +1,268 @@
-* Table of contents :toc:
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:ID:       id-20250103-231814
-:TRIGGER:  org-gtd-next-project-action org-gtd-update-project-task!
-:END:
-- [[#mode-for-reading-japanese][mode for reading japanese]]
-- [[#completed-features][completed features]]
-- [[#nomenclature][Nomenclature]]
-- [[#how-to-use][how to use]]
-  - [[#requirements][requirements]]
-  - [[#installation][installation]]
-- [[#limitations][Limitations]]
-- [[#status-database][status database]]
-- [[#mecab-parsing][mecab parsing]]
-- [[#compound-terms][compound terms]]
-- [[#speed][speed]]
-- [[#pitch-accent-to-be-done][pitch accent (to be done)]]
-- [[#kanji-lookups][kanji lookups]]
-- [[#current-bugstodos][current bugs/todos]]
-- [[#notes-to-myself][notes to myself]]
-
-* mode for reading japanese
+* Yomikun — Japanese Reading Assistant for Emacs
 :PROPERTIES:
 :CREATED:  2025-01-03 23:18:14
 :END:
 
-An attempt to bring yomichan/migaku features to emacs.
+Yomikun brings yomichan/migaku-style features to Emacs for learning Japanese.
+
+- Tokenize Japanese text using mecab (supports UniDic and IPAdic dictionaries)
+- Color-code words by grammatical type (nouns, verbs, particles, etc.)
+- Track learning status of words: known, unknown, learning, ignored
+- Look up definitions via tooltip (using [[https://github.com/melissaboiko/myougiden][myougiden]])
+- Look up kanji information (using [[https://github.com/neocl/jamdict][jamdict]])
+- Detect compound terms
+- Jump to reference sites ([[https://jisho.org][jisho.org]], [[http://kanjidamage.com][kanjidamage.com]])
 
 See a demo [[https://youtu.be/vOsyCawWjRc][here]].
 
-Features:
-
-- tokenize Japanese text
-  - support for compound words
-- keep track of reading status of words (similar to Anki's [[https://ankiweb.net/shared/info/900801631][morphan]] and [[https://ankiweb.net/shared/info/900801631][Migaku]])
-- overlay information about the current token
-  - token info
-  - fontify accordingly
-- dictionary support using [[https://github.com/melissaboiko/myougiden][myougiden]]. This means Eng-Jp , Jp-Eng.
-  - overlaid (similar to  [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
-  - keep a buffer with lookups
-- information about kanji using [[https://github.com/neocl/jamdict][jamdict]]
-- support for jumping to reference pages (e.g. [[https://jisho.org][jisho]], [[http://kanjidamage.com][kanjiDamage]])
-
-
 [[./screenshot.png]]
 
+* Quick Start
 
-* completed features
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
+1. Install the requirements (see below)
+2. Add to your Emacs config:
 
-I have been using Yomikun to read japanese for several months. It is usable and mostly complete.
+#+begin_src emacs-lisp
+(use-package emacsql :straight t)
+(use-package pos-tip :straight t)
+(use-package yomikun-db    :straight nil :load-path "~/.emacs.d/modules/yomikun")
+(use-package yomikun-mecab  :straight nil :load-path "~/.emacs.d/modules/yomikun")
+(use-package yomikun
+  :straight nil
+  :load-path "~/.emacs.d/modules/yomikun"
+  :config
+  (setq yk-mecab-binary "/opt/homebrew/bin/mecab")   ;; or your mecab path
+  (setq yk-mecab-dict-dir nil)                        ;; nil = use default dictionary
+  (setq yk-mecab-dict-type 'ipadic)                   ;; or 'unidic
+  (setq yk-db-status-file "~/jp-status.db")
+  (setq yk-db-dict-file "~/dictionary.db"))
+(use-package yomikun-dict :straight nil :load-path "~/.emacs.d/modules/yomikun")
+#+end_src
 
+3. Open a Japanese text file
+4. =M-x yk-minor-mode= — parses the buffer and activates keybindings
 
-- [X] tokenize and colour tokens by type
-- [X] typeset the text according to learning status (still to be completed)
-  - [X] known status saved in a SQLite database 
-  - [X] ability to change status interactively
-    - mark known, unknown, ignored and learning words
-- [X] support to identify and lookup compound terms (terms created by combining two or more morphs)
-- [X] display dictionary (similar to [[https://chrome.google.com/webstore/detail/yomichan/ogmnaimimemjmbakcfefmnahgdfhfami][yomichan]])
-- [X] kanji lookups  
-- [ ] support pitch accent
-- [-] add info for N-levels (N5, N4 and N3 already done)
-- [ ] make it async. Though it seems to be fast enough for a typical document.
-- [X] local mode
-- [X] operate in regions
-- [x] automatically display "quick" definition when cursor-sensor-mode is enabled
-- [ ] create reports of "readability"
-- [ ] support for morphman and anki  
-- [X] rename everything to something more meaningful
-- [ ] keep track of known kanji?
-- [ ] cleanup and reorganize code  
+* Requirements
 
-* Nomenclature
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
+** Mecab
 
-- a Japanese text is composed of a sequence of tokens, some of them non-japanese.
-- mecab converts the input text into a sequence of tokens
-- a morph (see morphman) is a Japanese word as it is learned
-  - it is composed of 3 parts:
-    1. surface. The version of the root known/learned
-    2. root. the actual word
-    3. type. the grammatical type of word
-- this module keeps track of the learned status of a word:
-  - ignore: we don't care for it, i.e. names, or interjections)
-  - learning: we are trying to remember it 
-  - known: the surface of the word (i.e. seen version of the root, eg. たベル vs 食べる) is known
-  - unknown: added to the db, but unknown
-  - if the morph is not in the db, it means it is unknown
+Yomikun uses [[https://taku910.github.io/mecab/][mecab]] for morphological analysis. Two dictionary formats are supported:
 
-* how to use
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-** requirements
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-*** mecab
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-This module relies primarily on mecab to parse japanese. In particular it uses mecab unidict.
-
-I think the easiest way is to download it from here: https://github.com/CrescentKohana/MecabUnidic/releases/tag/v1.2.1
-
-Download the corresponding binary and install. You should have a file support/matrix.bin that is 459Mbytes.
-
-Then create a script to run it from the command line using the corresponding
-files. I call this script m-mecab.sh
-
-Pay attention to the directory where the support files are installed. Make sure that the file mecab is executable.
+*** IPAdic (easiest)
 
 #+begin_src bash
-#!/usr/bin/env bash
-MDIR="/Users/dmg/bin/osx/MecabUnidic/support"
-export LD_LIBRARY_PATH="$MDIR":
-export DYLD_LIBRARY_PATH="$MDIR":
-#"$MDIR/mecab" -d $MDIR -h
-if [ "$1" == "" ] ; then
-    "$MDIR/mecab" -d $MDIR -r "$MDIR/mecabrc"
-else
-    "$MDIR/mecab" -d $MDIR -r "$MDIR/mecabrc" $*
-fi
-#unidic22
+brew install mecab mecab-ipadic
 #+end_src
 
-
-Make sure you get the following output (replace
-/Users/dmg/bin/osx/m-mecab.sh with the path to mecab in your installation). Note the number of columns in the output:
-
-#+begin_src bash :results verbatim :exports both
-echo "猫が大好きです。" | /Users/dmg/bin/osx/m-mecab.sh 
+Then set:
+#+begin_src emacs-lisp
+(setq yk-mecab-binary "mecab")
+(setq yk-mecab-dict-type 'ipadic)
 #+end_src
 
-#+RESULTS:
-#+begin_example
-猫	名詞,普通名詞,一般,*,*,*,ネコ,猫,猫,ネコ,猫,ネコ,和,*,*,*,*,*,*,体,ネコ,ネコ,ネコ,ネコ,1,C4,*,7918141678166528,28806
-が	助詞,格助詞,*,*,*,*,ガ,が,が,ガ,が,ガ,和,*,*,*,*,*,*,格助,ガ,ガ,ガ,ガ,*,"動詞%F2@0,名詞%F1",*,2168520431510016,7889
-大好き	形状詞,一般,*,*,*,*,ダイスキ,大好き,大好き,ダイスキ,大好き,ダイスキ,混,*,*,*,*,*,*,相,ダイスキ,ダイスキ,ダイスキ,ダイスキ,1,C1,*,6326873407758848,23017
-です	助動詞,*,*,*,助動詞-デス,終止形-一般,デス,です,です,デス,です,デス,和,*,*,*,*,*,*,助動,デス,デス,デス,デス,*,"形容詞%F2@-1,動詞%F2@0,名詞%F2@1",*,7051468750332587,25653
-。	補助記号,句点,*,*,*,*,*,。,。,*,。,*,記号,*,*,*,*,*,*,補助,*,*,*,*,*,*,*,6880571302400,25
-EOS
-#+end_example
+*** UniDic (more detailed tokenization)
 
-*** myougiden (Japanese dictionary)
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
+Download from [[https://github.com/CrescentKohana/MecabUnidic/releases/tag/v1.2.1][MecabUnidic releases]]. You need the homebrew mecab binary with the UniDic dictionary files:
 
-- Install [[https://github.com/melissaboiko/myougiden][myougiden]]. this is done using pip. See its website. After running pip you need to download/install the dictionary.
-
-- make sure you can run it from the command line:
-
-#+begin_src bash :results verbatim
-myougiden お願い
+#+begin_src emacs-lisp
+(setq yk-mecab-binary "/opt/homebrew/bin/mecab")
+(setq yk-mecab-dict-dir "/path/to/MecabUnidic/support")
+(setq yk-mecab-dict-type 'unidic)
 #+end_src
 
-#+RESULTS:
-#+begin_example
-おねがい	お願い；御願い	[n,vs,vt;pol] request|favour (to ask)|wish	[int] please (P)
-#+end_example
+*** Verifying your setup
 
-*** emacs libraries
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
+Run =M-x yk-doctor= to check that mecab, the dictionary, and the databases are all configured correctly.
 
-These libraries can be installed using melpa
+** Myougiden (dictionary lookups)
 
-**** emacsql
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-[[https://github.com/magit/emacsql]].
-
-Note. This might no longer be required in new versions of emacs.
-
-**** pos-tip
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-** installation
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-- update the variable yk-command with the location of the mecab executable. In my case it is a script that setup the proper resources used by mecab.
-  You can see its contents [[./other/m-mecab.sh][here]].
-- copy one of the status databases from [[./dbs/]] into your preferred location. The default location is ~/jp-status.db
-
-- copy and decompress the dictionary database ~/db/dictionary.db.bz2 to your preferred location. This database contains the quick definitions used in the
-  cursor-sensor-mode. It is much faster than looking up words in the dictionary.
-
-#+begin_src emacs-lisp   :exports both
-(require 'yomikun)
-(require 'yomikun-dict)
-
-;; replace with your path to mecab
-(setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
-
-;; replace with your preferred name and location. If the database does not exist, it will be created.
-(setq yk-db-status-file "~/jp-status.db")
-(setq yk-db-dict-file "~/dictionary.db")
+#+begin_src bash
+pip install myougiden
 #+end_src
 
-you will now have two commands available:
+After installation, download the dictionary database as described on the [[https://github.com/melissaboiko/myougiden][myougiden]] page.
 
-#+begin_src emacs-lisp   :exports both
-yk-do-buffer
+Verify:
+#+begin_src bash
+myougiden --human お願い
 #+end_src
 
-this function will process the entire buffer.
+** Jamdict (kanji information)
 
-and 
-
-#+begin_src emacs-lisp   :exports both
-yk-do-region
+#+begin_src bash
+pip install jamdict jamdict-data
 #+end_src
 
-which will do only the current region.
+After installation, verify the database location:
 
-Both commands can be run on text that has been already processed.
-
-At this point you can then enter the yk-minor-mode. This mode has the following commands:
-
-| i   | mark morph as ignored                |
-| k   | mark morph as known                  |
-| l   | mark morph as learning               |
-| u   | mark morph as unknown                |
-| j   | show morph in jisho.org              |
-| k   | show kanji in kanjidamage.com        |
-| p   | display properties of morph at point |
-| =   | mark current sentence                |
-| x   | exit minor mode                      |
-| RET | define term at point                 |
-
-* Limitations
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-- work in progress.
-- Tested only in macos but it should work without problems in linux
-- Processing of large text can take few seconds. For example Alice in Wonderland takes 8 seconds to process on an M1 mini.
- 
-* status database
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-The status database is a sqlite database created and managed by emacsql. This means that all attributes are surrounded by double quotes.
-
-The schema is fairly simple:
-
-| attribute | description                              |
-|-----------+------------------------------------------|
-| morph     | root of the morph                        |
-| mtype     | type                                     |
-| surface   | the root as processed                    |
-| status    | one of several: known, unknown, learning |
-| date      | date the tuple was added to the relation |
-
-The primary key is (morph, mtype, surface)
-
-there are databases with different JLPT levels at [[./dbs/]]
-
-* mecab parsing
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-From each sentence we obtain the root, the type of word, and the surface (kanji/hiragana version seen). For example:
-
-#+begin_example
-美味しい寿司を食べた。おいしくないすしはたべられない
-#+end_example
-
-#+name: mecab
-#+begin_src bash :results verbatim :exports both
-echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh
-#+end_src
-
-#+RESULTS:
-#+begin_example
-美味しい	形容詞,一般,*,*,形容詞,連体形-一般,オイシイ,美味しい,美味しい,オイシー,美味しい,オイシー,和,*,*,*,*,*,*,相,オイシイ,オイシイ,オイシイ,オイシイ,"0,3",C2,*,1201225110528705,4370
-寿司	名詞,普通名詞,一般,*,*,*,スシ,寿司,寿司,スシ,寿司,スシ,和,ス濁,基本形,*,*,*,*,体,スシ,スシ,スシ,スシ,"1,2",C3,*,5269967956222464,19172
-を	助詞,格助詞,*,*,*,*,ヲ,を,を,オ,を,オ,和,*,*,*,*,*,*,格助,ヲ,ヲ,ヲ,ヲ,*,"動詞%F2@0,名詞%F1,形容詞%F2@-1",*,11381878116459008,41407
-食べ	動詞,一般,*,*,下一段-バ行,連用形-一般,タベル,食べる,食べ,タベ,食べる,タベル,和,*,*,*,*,*,*,用,タベ,タベル,タベ,タベル,2,C1,M4@1,6220495691326081,22630
-た	助動詞,*,*,*,助動詞-タ,終止形-一般,タ,た,た,タ,た,タ,和,*,*,*,*,*,*,助動,タ,タ,タ,タ,*,"動詞%F2@1,形容詞%F4@-2",*,5948916285711019,21642
-。	補助記号,句点,*,*,*,*,*,。,。,*,。,*,記号,*,*,*,*,*,*,補助,*,*,*,*,*,*,*,6880571302400,25
-おいしく	形容詞,一般,*,*,形容詞,連用形-一般,オイシイ,美味しい,おいしく,オイシク,おいしい,オイシー,和,*,*,*,*,*,*,相,オイシク,オイシイ,オイシク,オイシイ,"0,3",C2,*,1201225076974209,4370
-ない	形容詞,非自立可能,*,*,形容詞,連体形-一般,ナイ,無い,ない,ナイ,ない,ナイ,和,*,*,*,*,*,*,相,ナイ,ナイ,ナイ,ナイ,1,C3,*,7543208145986241,27442
-すし	名詞,普通名詞,一般,*,*,*,スシ,寿司,すし,スシ,すし,スシ,和,ス濁,基本形,*,*,*,*,体,スシ,スシ,スシ,スシ,"1,2",C3,*,5269967855559168,19172
-は	助詞,係助詞,*,*,*,*,ハ,は,は,ワ,は,ワ,和,*,*,*,*,*,*,係助,ハ,ハ,ハ,ハ,*,"動詞%F2@0,名詞%F1,形容詞%F2@-1",*,8059703733133824,29321
-たべ	動詞,一般,*,*,下一段-バ行,未然形-一般,タベル,食べる,たべ,タベ,たべる,タベル,和,*,*,*,*,*,*,用,タベ,タベル,タベ,タベル,2,C1,M4@1,6220495657771585,22630
-られ	助動詞,*,*,*,助動詞-レル,未然形-一般,ラレル,られる,られ,ラレ,られる,ラレル,和,*,*,*,*,*,*,助動,ラレ,ラレル,ラレ,ラレル,*,動詞%F3@2,M4@1,10936575907209793,39787
-ない	助動詞,*,*,*,助動詞-ナイ,終止形-一般,ナイ,ない,ない,ナイ,ない,ナイ,和,*,*,*,*,*,*,助動,ナイ,ナイ,ナイ,ナイ,*,動詞%F3@0,*,7542108634358443,27438
-EOS
-#+end_example
-
-
-This output is reduced to the following. The first column is the word as seen, the second the type, then the morph, and
-finally the surface. Compare 美味しい and おいしい.
-
-#+begin_src bash :results verbatim :exports both
-echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh | csvcut -c 1,8,11
-#+end_src
-
-#+RESULTS:
-#+begin_example
-美味しい	形容詞,美味しい,美味しい
-寿司	名詞,寿司,寿司
-を	助詞,を,を
-食べ	動詞,食べる,食べる
-た	助動詞,た,た
-。	補助記号,。,。
-おいしく	形容詞,美味しい,おいしい
-ない	形容詞,無い,ない
-すし	名詞,寿司,すし
-は	助詞,は,は
-たべ	動詞,食べる,たべる
-られ	助動詞,られる,られる
-ない	助動詞,ない,ない
-EOS,,
-#+end_example
-
-
-This text would be stored as follows in the database. Note that 寿司 and 美味しい are stored twice. One for each version (kanji and hiragana).
-
-
-#+begin_src bash :results raw :exports results
-echo "美味しい寿司を食べた。おいしくないすしはたべられない" | m-mecab.sh | csvcut -c 1,8,11 | csvcut -t -c 2 -u 3
-#+end_src
-
-| wtype  | root   | surface |
-|--------+--------+---------|
-| 助動詞  | た      | た       |
-| 助動詞  | ない    | ない     |
-| 助動詞  | られる  | られる   |
-| 助詞    | は      | は       |
-| 助詞    | を      | を       |
-| 動詞    | 食べる  | たべる   |
-| 動詞    | 食べる  | 食べる   |
-| 名詞    | 寿司    | すし     |
-| 名詞    | 寿司    | 寿司     |
-| 形容詞  | 無い    | ない     |
-| 形容詞  | 美味しい | おいしい  |
-| 形容詞  | 美味しい | 美味しい  |
-
-* compound terms
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-to be written...
-
-* speed
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-Processing large amounts of text is slow. In my tests, emacs can do Alice in Wonderland in around 8 seconds in an M1 mini.
-
-- 4.5k morphs (probably wrong due to breaking lines in wrong place)
-- 98k characters
-- mecab outputs 64k lines
-
-The bottleneck is receiving and processing mecab's output.
-
-Finding compounds is optional. It is a CPU intensive process. Processing of Alice takes 
-approximately 10 seconds.
-
-* pitch accent (to be done)
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-to be done...
-
-https://github.com/javdejong/nhk-pronunciation/blob/master/nhk_pronunciation.py
-
-#+begin_src python   :exports both
-    txt = e.midashigo1
-    strlen = len(txt)
-    acclen = len(e.ac)
-    accent = "0"*(strlen-acclen) + e.ac
-#+end_src
-
-* kanji lookups
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-I have added a command to display information about a kanji called
-kanji-dict.py
-
-[[./other/kanji/]]
-
-See yk-kanji-dict-command in yomikun-dict.el
-
-This program needs the database created by jamdict. You need to install it
-https://github.com/neocl/jamdict
-
-Once installed, run:
-
-#+begin_src sh   :exports both
+#+begin_src bash
 python3 -m jamdict info
 #+end_src
 
-and record the Jamdict DB location. Change kanji-dict.py location of the database
-to this path.
+Look for the =Jamdict DB location= line. If it says =[OK]=, you're set.
 
-This is an example of the expected output:
+If =JAMDICT_HOME= shows =[Missing]=, create the directory and config:
 
-#+begin_example
-~/bin/kanji-dict.py 日本   
-日 Strokes: 4 Grade: 1 Freq: 1 JLPT: 4
-    day    sun    Japan    counter for days
-       ja_kun: ひ
-       ja_kun: -び
-       ja_kun: -か
-       ja_on: ニチ
-       ja_on: ジツ
-本 Strokes: 5 Grade: 1 Freq: 10 JLPT: 4
-    book    present    main    origin    true    real    counter for long cylindrical things
-       ja_kun: もと
-       ja_on: ホン
-
-Done.
-#+end_example
-
-
-* current bugs/todos
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-- [ ] ignore fontification is not working
-- [ ] compounds
-  - [ ] add compounds of 3 kanji to db (eg: 形状詞)
-  - [ ] fontify compounds
-  - [ ] mark compounds of a region, rather than all buffer
-  - [ ] keep track of status of compounds
-- [ ] add dictionary lookup for region
-
-* notes to myself
-:PROPERTIES:
-:CREATED:  2025-01-03 23:18:14
-:END:
-
-#+begin_src sqlite
-select glosses.ent_seq, kanjis.frequent, gloss_id, kanji, reading, pos, gloss
-       from kanjis join entries using (ent_seq)  join glosses using (ent_seq) join senses using (sense_id) join readings using (ent_seq)
-       --where kanji = '雨'
-       ;
+#+begin_src bash
+python3 -m jamdict config
 #+end_src
 
- #+begin_src sqlite   :exports both
-drop table if exists d.entries;
-create table d.entries as select distinct glosses.ent_seq, kanjis.frequent, gloss_id, kanji, reading, pos, gloss from kanjis join entries using (ent_seq)  join glosses using (ent_seq) join senses using (sense_id) join readings using (ent_seq) ;
-drop table if exists d.fentries;
-create table d.fentries as select * from d.entries join (select ent_seq, min(gloss_id) as gloss_id from d.entries group by ent_seq, kanji, reading, pos)  using (ent_seq, gloss_id);
- #+end_src
+The =kanji-dict.py= script (in [[./other/kanji/]]) needs the database path. If jamdict installed the DB in a non-standard location (common with pip =--user= installs), edit the path in =kanji-dict.py= or set:
 
+#+begin_src emacs-lisp
+(setq yk-kanji-dict-command '("/path/to/kanji-dict.py"))
+#+end_src
+
+Verify it works:
+#+begin_src bash
+kanji-dict.py 日本
+#+end_src
+
+Expected output: stroke count, grade, frequency, readings for each kanji.
+
+** Emacs packages
+
+- =emacsql= and =emacsql-sqlite= — SQLite database access ([[https://github.com/magit/emacsql][emacsql]])
+- =pos-tip= — tooltip display near point
+
+Both are available from MELPA.
+
+** Status database
+
+Copy one of the JLPT word lists from [[./db/]] as your starting database:
+
+#+begin_src bash
+cp db/tangoN5.db ~/jp-status.db
+#+end_src
+
+Or create an empty database with =M-x yk-db-status-create=.
+
+** Dictionary database
+
+Decompress the quick-lookup dictionary:
+
+#+begin_src bash
+bunzip2 -k db/dictionary.db.bz2
+cp db/dictionary.db ~/dictionary.db
+#+end_src
+
+This database provides fast definitions for the cursor-sensor auto-help feature.
+
+* Usage
+
+** Basic workflow
+
+1. Open a Japanese text file
+2. =M-x yk-minor-mode= — automatically parses the buffer, finds compounds, and activates keybindings
+3. Navigate the text — unknown words are highlighted with a colored background
+4. Mark words as you learn them using the keybindings below
+5. Press =RET= on any word to see its dictionary definition
+
+If the buffer has already been parsed, =yk-minor-mode= skips parsing and just activates the keybindings.
+
+** Processing commands
+
+| Command         | Description                                     |
+|-----------------+-------------------------------------------------|
+| =yk-minor-mode= | Activate yomikun (auto-parses if needed)         |
+| =yk-do-buffer=   | Parse the entire buffer                          |
+| =yk-do-region=   | Parse the selected region                        |
+| =yk-do-all-compounds= | Find compound terms (run after parsing)    |
+| =yk-verify-buffer= | Verify parsing consistency                    |
+| =yk-doctor=      | Diagnose mecab/database configuration            |
+
+** Minor mode keybindings
+
+| Key   | Command                          | Description                        |
+|-------+----------------------------------+------------------------------------|
+| =k=   | =yk-mark-at-point-as-known=      | Mark word as known                 |
+| =u=   | =yk-mark-at-point-as-unknown=    | Mark word as unknown               |
+| =l=   | =yk-mark-at-point-as-learning=   | Mark word as learning              |
+| =i=   | =yk-mark-at-point-as-ignored=    | Mark word as ignored               |
+| =RET= | =yk-define-at-point=             | Show dictionary definition         |
+| =n=   | =yk-kanji-at-point=             | Show kanji information             |
+| =j=   | =yk-jisho-at-point=             | Look up on jisho.org               |
+| =m=   | =yk-kanji-damage-at-point=      | Look up on kanjidamage.com         |
+| =p=   | =yk-prop-at-point=              | Show morph properties (debug)      |
+| ===   | =yk-mark-sentence-at-point=     | Select current sentence            |
+| =x=   | =yk-disable-mode=               | Exit yk-minor-mode                 |
+
+Marking a word updates its status globally — all occurrences in the buffer change color immediately.
+
+** Color coding
+
+Words are colored by grammatical type:
+
+| Type     | Japanese | Color       |
+|----------+----------+-------------|
+| Noun     | 名詞     | String face |
+| Verb     | 動詞     | Steel blue  |
+| Adjective | 形容詞  | Orange      |
+| Adverb   | 副詞     | Purple      |
+| Particle | 助詞     | Dark grey   |
+| Morpheme | 助動詞   | Magenta     |
+
+Unknown words additionally get a pink background. Learning words get a green background. Compound terms are underlined with a red wavy line.
+
+** Auto-help
+
+When =cursor-sensor-mode= is active (enabled automatically by =yk-minor-mode=), moving the cursor onto an unknown word shows a quick dictionary definition in a tooltip. This uses the quick-lookup dictionary database for speed.
+
+* Configuration
+
+All settings are available via =M-x customize-group RET yomikun=.
+
+| Variable                 | Default               | Description                          |
+|--------------------------+-----------------------+--------------------------------------|
+| =yk-mecab-binary=        | ="mecab"=              | Path to mecab executable             |
+| =yk-mecab-dict-dir=      | =nil=                  | Mecab dictionary directory           |
+| =yk-mecab-dict-type=     | =nil= (auto-detect)    | ='unidic= or ='ipadic=               |
+| =yk-db-status-file=      | ="~/yk-status.db"=     | Path to word status database         |
+| =yk-db-dict-file=        | =nil=                  | Path to quick-lookup dictionary      |
+| =yk-dict-command=         | ='("myougiden" "--human")= | Dictionary lookup command        |
+| =yk-kanji-dict-command=   | ='("kanji-dict.py")=   | Kanji lookup command                 |
+| =yk-tooltip-timeout=     | =10=                   | Tooltip display time (seconds)       |
+| =yk-max-tokens-to-process= | =10000=              | Safety limit for token processing    |
+| =yk-debug=                | =nil=                  | Enable debug messages                |
+
+* Module structure
+
+| File              | Purpose                                            |
+|-------------------+----------------------------------------------------|
+| =yomikun.el=       | Core: minor mode, faces, overlays, compounds        |
+| =yomikun-mecab.el= | Mecab: dictionary registry, parsing, diagnostics    |
+| =yomikun-db.el=    | Database: status tracking, dictionary, memoization  |
+| =yomikun-dict.el=  | Dictionary: lookups, tooltips, external commands    |
+
+* Word status
+
+Yomikun tracks four learning states for each word:
+
+| Status   | Meaning                                | Visual                    |
+|----------+----------------------------------------+---------------------------|
+| unknown  | New word, not yet studied              | Colored background (pink) |
+| learning | Currently studying                     | Colored background (green)|
+| known    | Fully learned                          | Text color only           |
+| ignored  | Skip (names, particles you know, etc.) | Grey background           |
+
+Words not in the database are treated as unknown.
+
+The status database is a SQLite file with primary key =(morph, mtype, surface)=. Pre-populated JLPT word lists (N3, N4, N5) are available in [[./db/]].
+
+* Limitations
+
+- Tooltip width may not perfectly match content on macOS Retina displays (pos-tip limitation)
+- Processing is synchronous — large files may take a few seconds
+- Compound detection requires the dictionary database
+- Tested on macOS; should work on Linux
+
+* Running tests
+
+#+begin_src bash
+emacs --batch \
+  -L . -L tests \
+  -L /path/to/straight/build/buttercup \
+  -l buttercup -f buttercup-run-discover
+#+end_src
+
+Tests require [[https://github.com/jorgenschaefer/emacs-buttercup][Buttercup]]. Integration tests require a working mecab installation.
