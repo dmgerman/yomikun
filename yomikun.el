@@ -933,17 +933,35 @@ The list is sorted using COMPARE-FUNC to compare elements."
 
 (defun yk-process-region (beg end)
   "Process the region BEG to END through mecab and apply token overlays.
-Uses `yomikun-mecab' for parsing with byte-offset based position mapping."
+Uses `yomikun-mecab' for parsing with byte-offset based position mapping.
+Processing is asynchronous — Emacs remains responsive during mecab execution."
   (let* ((input-text (buffer-substring-no-properties beg end))
-         (temp-file (yk-mecab--write-temp-file input-text)))
-    (unwind-protect
-        (let* ((args (yk-mecab--build-args temp-file))
-               (output (yk-mecab--run-command (cons yk-mecab-binary args)))
-               (tokens (yk-mecab--parse-output output input-text beg)))
-          (yk-debug-message "Parsed %d tokens" (length tokens))
-          (yk-process-tokens tokens))
-      (when (file-exists-p temp-file)
-        (delete-file temp-file)))))
+         (temp-file (yk-mecab--write-temp-file input-text))
+         (source-buffer (current-buffer))
+         (args (yk-mecab--build-args temp-file))
+         (proc-buffer (generate-new-buffer " *yomikun-mecab*")))
+    (buffer-disable-undo proc-buffer)
+    (let ((process (make-process
+                    :name "yomikun-mecab"
+                    :buffer proc-buffer
+                    :command (cons yk-mecab-binary args)
+                    :sentinel
+                    (lambda (proc event)
+                      (when (string-match-p "finished" event)
+                        (unwind-protect
+                            (let ((output (with-current-buffer (process-buffer proc)
+                                            (buffer-substring-no-properties
+                                             (point-min) (point-max)))))
+                              (with-current-buffer source-buffer
+                                (let ((tokens (yk-mecab--parse-output
+                                               output input-text beg)))
+                                  (yk-debug-message "Parsed %d tokens" (length tokens))
+                                  (yk-process-tokens tokens))))
+                          (when (buffer-live-p proc-buffer)
+                            (kill-buffer proc-buffer))
+                          (when (file-exists-p temp-file)
+                            (delete-file temp-file))))))))
+      (yk-debug-message "Mecab process started"))))
 
 (defun yk-visit-site-with-param (base-url parm)
   (let ((url (format base-url (url-hexify-string parm))))
