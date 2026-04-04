@@ -1023,5 +1023,92 @@ if the buffer has not already been processed."
            (message "Yomikun: ready."))))
     (cursor-sensor-mode -1)))
 
+;;; --- Verification ---
+
+(defun yk-verify-buffer ()
+  "Verify that yomikun parsing is consistent in the current buffer.
+Checks every morph position to ensure the `seen' text property matches
+the actual buffer text, overlays are present, and positions are valid.
+Reports results in *yomikun-verify* buffer."
+  (interactive)
+  (let ((mismatches nil)
+        (missing-overlays nil)
+        (orphan-positions nil)
+        (morph-count 0)
+        (overlay-count (length (overlays-in (point-min) (point-max))))
+        (buf-size (point-max))
+        (last-morph-pos nil))
+    ;; Walk every morph in the buffer
+    (let ((pos (point-min)))
+      (while pos
+        (when (get-text-property pos 'yk-morph)
+          (setq morph-count (1+ morph-count))
+          (setq last-morph-pos pos)
+          (let* ((seen (get-text-property pos 'seen))
+                 (root (get-text-property pos 'root))
+                 (begin-prop (get-text-property pos 'begin))
+                 (end-prop (get-text-property pos 'end))
+                 (actual (and seen
+                              (< (+ pos (length seen)) buf-size)
+                              (buffer-substring-no-properties
+                               pos (+ pos (length seen)))))
+                 (ovs (overlays-at pos)))
+            ;; Check seen matches actual text
+            (when (and seen actual (not (string-equal seen actual)))
+              (push (list pos seen actual root) mismatches))
+            ;; Check overlay exists (only for morphs that should have a face)
+            (let ((expected-face (and root
+                                     (get-text-property pos 'status)
+                                     (yk-wtype-status-to-face
+                                      (get-text-property pos 'wtype)
+                                      (get-text-property pos 'status)))))
+              (when (and expected-face (not ovs))
+                (push (list pos root) missing-overlays)))
+            ;; Check begin property matches position
+            (when (and begin-prop (/= begin-prop pos))
+              (push (list pos begin-prop) orphan-positions))))
+        (setq pos (next-single-property-change pos 'yk-morph))))
+
+    ;; Report
+    (let ((buf (get-buffer-create "*yomikun-verify*"))
+          (ok (and (null mismatches) (null missing-overlays) (null orphan-positions))))
+      (with-current-buffer buf
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert (format "=== Yomikun Verification: %s ===\n\n"
+                          (buffer-name (other-buffer buf t))))
+          (insert (format "Buffer size: %d chars\n" (1- buf-size)))
+          (insert (format "Morphs found: %d\n" morph-count))
+          (insert (format "Overlays: %d\n" overlay-count))
+          (insert (format "Last morph at: %d (%d%% coverage)\n\n"
+                          (or last-morph-pos 0)
+                          (if last-morph-pos (/ (* 100 last-morph-pos) buf-size) 0)))
+
+          (if ok
+              (insert "ALL CHECKS PASSED\n")
+            (when mismatches
+              (insert (format "MISMATCHES: %d (seen property != buffer text)\n"
+                              (length mismatches)))
+              (dolist (m (seq-take mismatches 10))
+                (insert (format "  pos %d: seen=%s actual=%s root=%s\n"
+                                (nth 0 m) (nth 1 m) (nth 2 m) (nth 3 m))))
+              (when (> (length mismatches) 10)
+                (insert (format "  ... and %d more\n" (- (length mismatches) 10)))))
+            (when missing-overlays
+              (insert (format "MISSING OVERLAYS: %d\n" (length missing-overlays)))
+              (dolist (m (seq-take missing-overlays 10))
+                (insert (format "  pos %d: root=%s\n" (nth 0 m) (nth 1 m)))))
+            (when orphan-positions
+              (insert (format "POSITION MISMATCHES: %d (begin prop != actual position)\n"
+                              (length orphan-positions)))
+              (dolist (m (seq-take orphan-positions 10))
+                (insert (format "  pos %d: begin-prop=%d\n" (nth 0 m) (nth 1 m))))))
+          (goto-char (point-min))))
+      (display-buffer buf)
+      (if ok
+          (message "Yomikun: verification passed (%d morphs, %d overlays)"
+                   morph-count overlay-count)
+        (message "Yomikun: verification FAILED — see *yomikun-verify* buffer")))))
+
 (provide 'yomikun)
 ;;; yomikun.el ends here

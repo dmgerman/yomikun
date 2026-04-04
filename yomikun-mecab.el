@@ -256,16 +256,39 @@ Splits at the last space/newline before the byte limit."
 
 (defun yk-mecab--find-split-point (text chunk-start chunk-end)
   "Find a good split point in TEXT between CHUNK-START and CHUNK-END.
-Prefers splitting after 。, newline, or space.  Falls back to CHUNK-END."
-  (let ((best chunk-end)
+Prefers splitting at paragraph boundaries (\\n\\n), then after Japanese
+period (。), then after newline, then after Japanese comma (、).
+Falls back to CHUNK-END if no boundary found."
+  (let ((best nil)
         (pos (1- chunk-end)))
-    (while (and (> pos chunk-start)
-                (= best chunk-end))
-      (let ((ch (aref text pos)))
-        (when (memq ch '(?。 ?\n ?  ?\t))
-          (setq best (1+ pos))))
+    ;; First pass: look for paragraph boundary (\n\n)
+    (while (and (> pos (1+ chunk-start)) (not best))
+      (when (and (= (aref text pos) ?\n)
+                 (= (aref text (1- pos)) ?\n))
+        (setq best (1+ pos)))
       (setq pos (1- pos)))
-    best))
+    ;; Second pass: look for 。
+    (unless best
+      (setq pos (1- chunk-end))
+      (while (and (> pos chunk-start) (not best))
+        (when (= (aref text pos) ?。)
+          (setq best (1+ pos)))
+        (setq pos (1- pos))))
+    ;; Third pass: look for 、
+    (unless best
+      (setq pos (1- chunk-end))
+      (while (and (> pos chunk-start) (not best))
+        (when (= (aref text pos) ?、)
+          (setq best (1+ pos)))
+        (setq pos (1- pos))))
+    ;; Fourth pass: look for single \n
+    (unless best
+      (setq pos (1- chunk-end))
+      (while (and (> pos chunk-start) (not best))
+        (when (= (aref text pos) ?\n)
+          (setq best (1+ pos)))
+        (setq pos (1- pos))))
+    (or best chunk-end)))
 
 (defun yk-mecab--parse-output (mecab-output input-text region-offset)
   "Parse MECAB-OUTPUT into a list of token plists.

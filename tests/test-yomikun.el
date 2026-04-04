@@ -965,4 +965,70 @@ Returns the buffer. Caller must kill it."
     (yk-auto-help-at-point nil nil 'left)
     (expect 'yk-quick-dict-at :not :to-have-been-called)))
 
+;;; --- yk-verify-buffer ---
+
+(describe "yk-verify-buffer"
+  :var (temp-db saved-status-file saved-db-status mecab-works)
+
+  (before-all
+    (setq mecab-works
+          (and (yk-test-mecab-available-p)
+               (condition-case nil
+                   (progn (yk-mecab--detect-dict-type) t)
+                 (error nil)))))
+
+  (before-each
+    (setq saved-status-file yk-db-status-file)
+    (setq saved-db-status yk-db-status)
+    (setq temp-db (make-temp-file "yomikun-test-" nil ".db"))
+    (delete-file temp-db)
+    (setq yk-db-status-file temp-db)
+    (setq yk-db-status nil)
+    (yk-db-status-create)
+    (clrhash yk-status-table))
+
+  (after-each
+    (yk-db-status-close)
+    (when (file-exists-p temp-db) (delete-file temp-db))
+    (setq yk-db-status-file saved-status-file)
+    (setq yk-db-status saved-db-status)
+    (clrhash yk-status-table)
+    (when (get-buffer "*yomikun-verify*")
+      (kill-buffer "*yomikun-verify*")))
+
+  (it "passes on a correctly parsed buffer"
+    (assume mecab-works "mecab not available or not configured")
+    (with-temp-buffer
+      (insert "東京都に住んでいる。猫が好きです。")
+      (yk-do-region (point-min) (point-max))
+      (yk-verify-buffer)
+      (with-current-buffer "*yomikun-verify*"
+        (expect (buffer-string) :to-match "ALL CHECKS PASSED"))))
+
+  (it "passes on duplicated fixture file (tests chunking)"
+    (assume mecab-works "mecab not available or not configured")
+    (let* ((base-text (with-temp-buffer
+                        (insert-file-contents
+                         (expand-file-name "kumo_no_ito.txt" yk-test--fixture-dir))
+                        (buffer-string)))
+           (text (concat base-text "\n" base-text)))
+      (with-temp-buffer
+        (insert text)
+        (yk-do-region (point-min) (point-max))
+        (yk-verify-buffer)
+        (with-current-buffer "*yomikun-verify*"
+          (expect (buffer-string) :to-match "ALL CHECKS PASSED")))))
+
+  (it "detects misaligned seen properties"
+    (with-temp-buffer
+      (insert "猫が好き")
+      (with-silent-modifications
+        (put-text-property 1 2 'yk-morph t)
+        (put-text-property 1 2 'seen "犬")  ;; wrong: says 犬 but buffer has 猫
+        (put-text-property 1 2 'root "犬")
+        (put-text-property 1 2 'begin 1))
+      (yk-verify-buffer)
+      (with-current-buffer "*yomikun-verify*"
+        (expect (buffer-string) :to-match "MISMATCHES")))))
+
 ;;; test-yomikun.el ends here

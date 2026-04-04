@@ -279,6 +279,17 @@
       (let ((reconstructed (mapconcat #'car chunks "")))
         (expect reconstructed :to-equal repeated))))
 
+  (it "prefers paragraph boundaries over sentence boundaries"
+    (let* ((para1 (apply #'concat (make-list 80 "東京都に住む。")))  ;; ~80 sentences
+           (para2 (apply #'concat (make-list 80 "大阪府で暮らす。")))
+           (text (concat para1 "\n\n" para2))
+           (chunks (yk-mecab--split-into-chunks text)))
+      ;; If paragraph boundary is within range, should split there
+      (when (> (length chunks) 1)
+        (let ((first-chunk (car (car chunks))))
+          ;; First chunk should end at the paragraph boundary
+          (expect (string-suffix-p "\n\n" first-chunk) :to-be-truthy)))))
+
   (it "splits at sentence boundaries when possible"
     (let* ((sentence "東京都に住んでいる。")
            ;; ~240 sentences * ~28 bytes = ~6720 bytes per chunk
