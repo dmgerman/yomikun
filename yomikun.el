@@ -668,12 +668,10 @@ The list is sorted using COMPARE-FUNC to compare elements."
     (message "total: %d" (length morphs))))
 
 (defun yk-update-status-at-position (beg end wtype newstatus)
-  ;;
-  ;;  replace the overlays at the given position
-  ;;  according to the new status
-  ;;
-  (yk-set-overlay-wtype-at-pos beg end wtype newstatus )
-)
+  "Update the overlay and status text property at BEG..END."
+  (yk-set-overlay-wtype-at-pos beg end wtype newstatus)
+  (with-silent-modifications
+    (put-text-property beg end 'status newstatus)))
 
 
 (defun yk-replace-all-overlays (props newstatus)
@@ -694,57 +692,28 @@ The list is sorted using COMPARE-FUNC to compare elements."
   )
 
 (defun yk-morph-new-status (props new-status)
-  ;; mark the morph in props as new status
-  ;; in the database and in the database
-  ;; 
-  (let* (
-         (root (plist-get props   'root))
-         (wtype (plist-get props  'wtype))
+  "Update the status of the morph described by PROPS to NEW-STATUS.
+Updates the database, memoization cache, and all overlays in the buffer."
+  (let* ((root (plist-get props 'root))
+         (wtype (plist-get props 'wtype))
          (old-status (plist-get props 'status))
-         (surface (plist-get props 'surface))
-         )
-;    (message "after let [%s] [%s] [%s]-> [%s] " root wtype status new-status)
-;    (message "   begin end [%s] [%s]" beg end)
+         (surface (plist-get props 'surface)))
     (if (not (string-equal old-status new-status))
         (progn
-          (message "setting new status [%s] old [%s]" new-status old-status)
-          (message "   root [%s] wtype [%s] surface [%s]" root wtype surface)
-          ; we need to set the status of that word everywhere...
+          (yk-debug-message "Setting status [%s] → [%s] for %s/%s/%s"
+                            old-status new-status root wtype surface)
           (yk-morph-status-set root wtype surface new-status)
-          ;; now we have to process the document to find instances of the word
-          ;; ... there is a need for a redo buffer
-          ;; but that is expensive, soo simply scan the document
-          ;; and find any instances of the morph
-          ;; and change its property
-          ;; first remove all overlays in the file
-          (yk-replace-all-overlays props new-status)
-          )
-      (message "morph (%s %s %s)already has [%s] status" root wtype surface new-status)
-      )
-    ))
+          (yk-replace-all-overlays props new-status))
+      (yk-debug-message "Morph %s/%s/%s already has status [%s]"
+                        root wtype surface new-status))))
 
 (defun yk-wtype-status-to-face (wtype status)
-                                        ;  (and
-;  (message "inside yk-wtype-status-to-face [%s][%s]" wtype status)
-  (let* (
-        (font-table (yk-font-table-wtype-to-use status))
-        (face (assoc wtype font-table))
-        )
-;    (message "inside let [%s]" face)
-;    (message "table used [%s]" font-table)
+  "Return the face for WTYPE and STATUS, or nil if none applies."
+  (let* ((font-table (yk-font-table-wtype-to-use status))
+         (face (assoc wtype font-table)))
     (if face
         (cdr face)
-      ;; else
-      (let (
-            (face (cdr-safe (assoc status yk-font-table-default-status)))
-            )
-        (message "> no face for wtype. [%s] status [%s].. using [%s]" wtype status face)
-        face
-        )
-      
-      )
-    )   
-  )
+      (cdr-safe (assoc status yk-font-table-default-status)))))
 
 (defun yk-set-overlay (name beg end face)
   (let ((ovl (make-overlay beg end)))

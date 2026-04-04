@@ -46,9 +46,9 @@
     (let ((result (yk-run-external-command '("echo" "-n") "hello")))
       (expect result :to-equal "hello")))
 
-  (it "returns error message for non-zero exit code"
+  (it "returns no-results message for non-zero exit with no output"
     (let ((result (yk-run-external-command '("false") "anything")))
-      (expect result :to-match "Command failed"))))
+      (expect result :to-match "No results"))))
 
 ;;; --- yk-extract-word-at-point ---
 

@@ -666,6 +666,128 @@ Returns the buffer. Caller must kill it."
       (goto-char 1)
       (expect (yk-properties-at-point) :to-be nil))))
 
+;;; --- Full status change lifecycle ---
+
+(describe "status change lifecycle (end-to-end)"
+  :var (temp-db saved-status-file saved-db-status)
+
+  (before-each
+    (setq saved-status-file yk-db-status-file)
+    (setq saved-db-status yk-db-status)
+    (setq temp-db (make-temp-file "yomikun-test-" nil ".db"))
+    (delete-file temp-db)
+    (setq yk-db-status-file temp-db)
+    (setq yk-db-status nil)
+    (yk-db-status-create)
+    (clrhash yk-status-table))
+
+  (after-each
+    (yk-db-status-close)
+    (when (file-exists-p temp-db) (delete-file temp-db))
+    (setq yk-db-status-file saved-status-file)
+    (setq yk-db-status saved-db-status)
+    (clrhash yk-status-table))
+
+  (it "mark-as-known updates DB, cache, and overlay face"
+    (with-temp-buffer
+      (insert "猫が猫が")
+      (with-silent-modifications
+        ;; First 猫
+        (put-text-property 1 2 'root "猫")
+        (put-text-property 1 2 'wtype "名詞")
+        (put-text-property 1 2 'surface "猫")
+        (put-text-property 1 2 'status "unknown")
+        (put-text-property 1 2 'begin 1)
+        (put-text-property 1 2 'yk-morph t)
+        (yk-set-overlay 'yomikun 1 2 'yk-face-noun-unknown)
+        ;; が
+        (put-text-property 2 3 'root "が")
+        (put-text-property 2 3 'wtype "助詞")
+        (put-text-property 2 3 'surface "が")
+        (put-text-property 2 3 'status "unknown")
+        (put-text-property 2 3 'begin 2)
+        (put-text-property 2 3 'yk-morph t)
+        (yk-set-overlay 'yomikun 2 3 'yk-face-particle-unknown)
+        ;; Second 猫
+        (put-text-property 3 4 'root "猫")
+        (put-text-property 3 4 'wtype "名詞")
+        (put-text-property 3 4 'surface "猫")
+        (put-text-property 3 4 'status "unknown")
+        (put-text-property 3 4 'begin 3)
+        (put-text-property 3 4 'yk-morph t)
+        (yk-set-overlay 'yomikun 3 4 'yk-face-noun-unknown)
+        ;; Trailing が
+        (put-text-property 4 5 'root "が")
+        (put-text-property 4 5 'wtype "助詞")
+        (put-text-property 4 5 'surface "が")
+        (put-text-property 4 5 'status "unknown")
+        (put-text-property 4 5 'begin 4)
+        (put-text-property 4 5 'yk-morph t)
+        (yk-set-overlay 'yomikun 4 5 'yk-face-particle-unknown))
+
+      ;; Act: mark first 猫 as known
+      (goto-char 1)
+      (yk-mark-at-point-as-known)
+
+      ;; Assert: DB updated
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "known")
+
+      ;; Assert: status text property on first 猫 updated
+      (expect (get-text-property 1 'status) :to-equal "known")
+
+      ;; Assert: status text property on second 猫 also updated
+      (expect (get-text-property 3 'status) :to-equal "known")
+
+      ;; Assert: overlay on first 猫 changed to known face
+      (let ((ov (car (overlays-at 1))))
+        (expect ov :to-be-truthy)
+        (expect (overlay-get ov 'font-lock-face) :to-equal 'yk-face-noun))
+
+      ;; Assert: overlay on second 猫 also changed (document-wide update)
+      (let ((ov (car (overlays-at 3))))
+        (expect ov :to-be-truthy)
+        (expect (overlay-get ov 'font-lock-face) :to-equal 'yk-face-noun))
+
+      ;; Assert: が overlay unchanged
+      (let ((ov (car (overlays-at 2))))
+        (expect (overlay-get ov 'font-lock-face)
+                :to-equal 'yk-face-particle-unknown))))
+
+  (it "cycles through unknown → learning → known → ignore"
+    (with-temp-buffer
+      (insert "猫が")
+      (with-silent-modifications
+        (put-text-property 1 2 'root "猫")
+        (put-text-property 1 2 'wtype "名詞")
+        (put-text-property 1 2 'surface "猫")
+        (put-text-property 1 2 'status "unknown")
+        (put-text-property 1 2 'begin 1)
+        (put-text-property 1 2 'yk-morph t)
+        (yk-set-overlay 'yomikun 1 2 'yk-face-noun-unknown)
+        (put-text-property 2 3 'begin 2)
+        (put-text-property 2 3 'yk-morph t))
+
+      (goto-char 1)
+
+      ;; unknown → learning
+      (yk-mark-at-point-as-learning)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "learning")
+      (expect (get-text-property 1 'status) :to-equal "learning")
+      (expect (overlay-get (car (overlays-at 1)) 'font-lock-face)
+              :to-equal 'yk-face-noun-learning)
+
+      ;; learning → known (status text property was updated by previous call)
+      (yk-mark-at-point-as-known)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "known")
+      (expect (get-text-property 1 'status) :to-equal "known")
+      (expect (overlay-get (car (overlays-at 1)) 'font-lock-face)
+              :to-equal 'yk-face-noun)
+
+      ;; known → ignore (status text property was updated by previous call)
+      (yk-mark-at-point-as-ignored)
+      (expect (yk-morph-status-get "猫" "名詞" "猫") :to-equal "ignore")
+      (expect (get-text-property 1 'status) :to-equal "ignore"))))
+
 ;;; --- Mark-at-point functions ---
 
 (describe "yk-mark-at-point-as-known"

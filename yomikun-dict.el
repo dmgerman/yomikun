@@ -86,10 +86,10 @@ Install it or update the command configuration" program))
           (let ((exit-code (apply #'call-process
                                   program nil t nil
                                   (append (cdr command) (list term)))))
-            (if (= exit-code 0)
-                (buffer-string)
-              (format "Command failed (exit %d): %s"
-                      exit-code (buffer-string))))))
+            (let ((output (buffer-string)))
+              (if (> (length output) 0)
+                  output
+                (format "No results (exit %d)" exit-code))))))
     "no term given"))
 
 (defun yk-run-dictionary (term)
