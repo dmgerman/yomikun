@@ -1,5 +1,4 @@
 ;;; -*- lexical-binding: t; -*-
-;; -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2023 daniel german (dmg@turingmachine.org)
 
@@ -48,14 +47,6 @@
 (defvar yk-db-dict nil)   ;; instance of the quick dictionary db
 (defvar yk-db-status nil) ;; instance of the status db
 
-;; TODO move my own configuration somewhere else
-
-(setq yk-mecab-command  "/Users/dmg/bin/osx/m-mecab.sh")
-(setq yk-max-tokens-to-process 100000)
-(setq yk-db-status-file "~/jp-status.db")
-(setq yk-db-dict-file "~/dictionary.db")
-
-
 (defun yk-db-status-open ()
   (interactive)
     (when (not (file-exists-p yk-db-status-file))
@@ -77,12 +68,14 @@
   )
 
 (defun yk-db-dict-close ()
-  (emacsql-close yk-db-dict)
-  )
+  (when yk-db-dict
+    (emacsql-close yk-db-dict)
+    (setq yk-db-dict nil)))
 
 (defun yk-db-status-close()
-  (emacsql-close yk-db-status)
-  )
+  (when yk-db-status
+    (emacsql-close yk-db-status)
+    (setq yk-db-status nil)))
 
 (defun yk-get-time-date ()
   (format-time-string yk-date-format (current-time))
@@ -133,10 +126,8 @@
   
    )
 
-;; this is a memoization of the compounds queries
-;; it does not seem to make an impact worth the memory it uses
-;; currently unused
-(setq yk-compound-candidates-table (make-hash-table :test 'equal))
+(defvar yk-compound-candidates-table (make-hash-table :test 'equal)
+  "Memoization cache for compound query results.")
 
 (defun yk-compound-prefix-candidates (st)
   (or (gethash st yk-compound-candidates-table)
@@ -181,9 +172,8 @@
   )
 
 
-;; hash used for memoization of dictionary lookups
-;; currently unused
-(setq yk-dict-table (make-hash-table :test 'equal))
+(defvar yk-dict-table (make-hash-table :test 'equal)
+  "Memoization cache for dictionary lookups.")
 
 (defun yk-dict-def (root pronun wtype)
   (or (gethash (list root pronun wtype) yk-dict-table)
@@ -242,11 +232,11 @@ return match as a list or nil if not found
    (yk-db-morph-status-insert root wtype surface status))
   )
 
-;; initialize hash table
-(setq yk-status-table (make-hash-table :test 'equal))
+(defvar yk-status-table (make-hash-table :test 'equal)
+  "Memoization cache for morph status lookups.")
 
-;; counter for profiling purposes
-(setq yk-repeat-counter 0)
+(defvar yk-repeat-counter 0
+  "Counter for profiling database lookups.")
 
 (defun yk-morph-status-get (root wtype surface)
   "memoized function that checks for the status of a given morph."
@@ -343,7 +333,7 @@ return match as a list or nil if not found
   '((t (:inherit font-lock-string-face
                  )))
   "Face for noun unknown"
-  :group 'my
+  :group 'yomikun
   )
 
 (defface yk-face-noun-alt
@@ -360,7 +350,7 @@ return match as a list or nil if not found
     (((class color) (background dark))
      (:foreground  "blue")))
   "Face for verb"
-  :group 'my
+  :group 'yomikun
   )
 
 (defface yk-face-morpheme
@@ -514,13 +504,11 @@ return match as a list or nil if not found
    Defaults to the unknown table
 
 "
-  (cond 
+  (cond
    ((string-equal "known" status)     yk-wtype-table)
    ((string-equal "learning" status)  yk-wtype-table-status-learning)
    ((string-equal "ignore" status)    nil)
-   (yk-wtype-table-status-unknown)
-   )
-  )
+   (t yk-wtype-table-status-unknown)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; some high order functions to
@@ -807,24 +795,13 @@ and call pfun on it"
       )))
 
 (defun yk-morph-matches-at (morphProps pos)
-  (let ((pos (point))
-         (props (text-properties-at pos))
-         )
-;    (progn
+  (let ((props (text-properties-at pos)))
      (and (string-equal (plist-get morphProps 'root)
-                        (plist-get props 'root)
-                        )
+                        (plist-get props 'root))
           (string-equal (plist-get morphProps 'wtype)
-                        (plist-get props 'wtype)
-                        )
+                        (plist-get props 'wtype))
           (string-equal (plist-get morphProps 'surface)
-                        (plist-get props 'surface)
-                        )
-          )
-     )
-;    )
-  
-  )
+                        (plist-get props 'surface)))))
 
 (defun yk-morphs-delete-overlays-at-pos (name beg end)
   "delete overlays between beg and end that have property name equal t"
@@ -852,8 +829,8 @@ and call pfun on it"
     (remove-overlays beg end 'yomikun-comp t)
   )))
 
-(setq yk-test-all-morphs (make-hash-table :test 'equal));(list))
-;;(setq yk-status-table (make-hash-table :test 'equal))
+(defvar yk-test-all-morphs (make-hash-table :test 'equal)
+  "Hash table for morph frequency analysis.")
 
 (defun yk-morph-get-morph-from-props (props)
   "get the morph from the properties"
@@ -982,31 +959,6 @@ The list is sorted using COMPARE-FUNC to compare elements."
       )
     ))
 
-;; (defun yk-mark-morph-as-known (beg end)
-  
-;;   )
-
-;; (defun yk-morph-set-known ()
-;;   (interactive)
-;;   (let* (
-;;          (pos (point))
-;;          (props (text-properties-at pos))
-;;          )
-;;     (if (and props 
-;;              (plist-get props 'root)
-;;              )
-;;         (progn ;
-;;           (yk-morph-new-status props "known")
-
-;;           (yk-morph-do-morphs
-;;            (lambda (beg) (yk-morph-matches-at props beg  )););
-;;            'yk-mark-as-known
-;;            )
-;;           )
-;;       )
-;;     )
-;;   )
-
 (defun yk-wtype-status-to-face (wtype status)
                                         ;  (and
 ;  (message "inside yk-wtype-status-to-face [%s][%s]" wtype status)
@@ -1031,13 +983,9 @@ The list is sorted using COMPARE-FUNC to compare elements."
   )
 
 (defun yk-set-overlay (name beg end face)
-  (let (
-        (ovl (make-overlay beg end));)
-        )
+  (let ((ovl (make-overlay beg end)))
     (overlay-put ovl 'font-lock-face face)
-    (overlay-put ovl 'yomikun t)
-    )
-  )
+    (overlay-put ovl name t)))
 
 (defun yk-set-overlay-compound-at-pos (beg end)
   (yk-set-overlay 'yomikun-comp beg end 'yk-face-compound) 
@@ -1390,17 +1338,11 @@ Properties is a property-list with information about the
       (
        ;; get raw mecab output
        (output (with-current-buffer mecabBuffer
-                 (progn
-                   (buffer-substring-no-properties (point-min) (point-max)))
-                 )
-               )
-       (yk-debug-message "done processing raw mecab")
+                 (buffer-substring-no-properties (point-min) (point-max))))
        ;; save mecab output, remove end-of-process message
        (outputMecab (substring output 0 (string-match yk-process-end-st output)))
        ;; separate tokens
        (jpTokens (yk-process-filter beg end outputMecab))
-       (yk-debug-message "done processing processing tokens")
-
        )
     (yk-debug-message "finished mecab processing %d tokens" (length jpTokens))
 ;    (message "[%s]" jpTokens )
@@ -1456,99 +1398,6 @@ Properties is a property-list with information about the
       (kill-buffer yk-process-buffer)
       (delete-file temp-file)
       )      
-    )
-  )
-
-(defun yk-process-region2 (beg end)
-  (let (
-        
-        (process (start-process-shell-command yk-process-name yk-process-buffer yk-mecab-command)
-                 )
-        )
-    (progn
-      ;; async input is buffered and we do not want to process
-      ;; incomplete lines. So wait until all output is created and process it
-      (setq process-adaptive-read-buffering t)
-      (yk-debug-message "process starting")
-                                        ;      (with-current-buffer yk-process-buffer
-                                        ;        (mapc (lambda (x) (funcall x -1))
-                                        ;              (yk-active-minor-modes))
-                                        ;        )
-
-      (process-send-region process beg end)
-      (process-send-eof process)
-      (yk-debug-message "process sent")
-      (while (accept-process-output process))
-      (yk-debug-message "mecab Done")
-      (yk-process-mecab beg end yk-process-buffer)
-      (yk-debug-message "finished processing buffer")
-      (kill-buffer yk-process-buffer)
-      )      
-    )
-  )
-
-
-;; these two functions were supposed to be a way to make it faster... but it ended
-;; being slower. Wayyyyyyyyyyy slower
-;; go figure
-
-(defun yk-process-mecab-output (beg end outputMecab)
-  "Process mecab output mecab on region.
-
-  buffer is the process output from mecab
-
-  1. synchronize text and mecab
-  2. Process mecab records
-     for reach line in mecab, create a token
-  3. process each token
-     - add properties and overlay
-
-"
-  (let*
-      (
-       (jpTokens (yk-process-filter beg end outputMecab))
-       )
-    (yk-debug-message "finished mecab processing %d tokens" (length jpTokens))
-                                        ;    (message "[%s]" jpTokens )
-    ;; process the tokens
-    (yk-process-tokens jpTokens)
-    )
-  )
-
-
-
-(defun yk-process-region-test (beg end)
-  ;; execute command (list of strings)
-  ;; return the output of the command
-  (interactive "r")
-  (setq process-adaptive-read-buffering t)
-  (let (
-        (mecabOutput "")
-        (output (list))
-        (process (make-process
-                  :name "yk-process"
-                  :buffer nil
-                  :command (list yk-mecab-command)
-                  :filter 'yk-filter
-                  :sentinel 'yk-sentinel
-                  )
-                 )
-        )
-    (defun yk-filter (proc string)
-   ;;(message "from [%s] process [%s] string [%s]" yk-output proc string)
-      (setq output (cons string output))
-      
-      )
-    (defun yk-sentinel (process event)
-      (yk-debug-message "Process: [%s] had event [%s]" process event)
-      (setq mecabOutput
-            (mapconcat 'identity (reverse output) "")
-            )
-      (yk-process-mecab-output beg end mecabOutput)
-      (yk-debug-message "finally finishing with length of output [%d] " (length output))
-      )
-    (process-send-region process beg end)
-    (process-send-eof process)
     )
   )
 
@@ -1639,32 +1488,7 @@ Properties is a property-list with information about the
   )
 
 
-;; some utility functions
-
-(defun yk-pos ()
-  (interactive)
-  (message "%s" (point))
-  )
-
 (defun yk-until-eoln (st)
-  (substring st 0 (string-match "\n" st))
-  )
-
-(defun yk-abc ()
-  (interactive)
-  (find-file "/tmp/alice.txt")
-  )
-
-
-(defun yk-test ()
-  (interactive)
-  (kill-buffer "*Messages*")
-  (kill-buffer "alice.txt")
-  (find-file "/tmp/alice.txt")
-  (load-file "/Users/dmg/.emacs.d/dmg-jp.el")
-  (setq patito32 (yk-mecab-command-on-buffer))
-  )
-
-;;(setq inhibit-point-motion-hooks t)
+  (substring st 0 (string-match "\n" st)))
 
 (provide 'yomikun)

@@ -17,10 +17,12 @@
 ;;;(require 'popup)
 (require 'pos-tip)
 
-;; important to wrap %s with single quotes to avoid problems with
-;; shell special characters. Single quotes are removed from term to be search for
-(defvar yk-dict-command "myougiden --human '%s'")
-(defvar yk-kanji-dict-command "kanji-dict.py '%s'")
+;; Dictionary command: list of (program arg1 arg2 ...)
+;; The lookup term is appended as the final argument.
+(defvar yk-dict-command '("myougiden" "--human")
+  "Command and arguments for dictionary lookup. Term is appended.")
+(defvar yk-kanji-dict-command '("kanji-dict.py")
+  "Command and arguments for kanji lookup. Term is appended.")
 
 (defvar yk-tango-buffer-name "*yk-tango*")
 
@@ -36,12 +38,10 @@
         (start 0))
     (while (string-match "\n" str start)
       (let ((end (match-end 0))
-            (length (- (match-end 0) start 1) ) )
-        (message "current match [%s][%s]" end length)
+            (length (- (match-end 0) start 1)))
         (when (> length longest)
           (setq longest length))
-        (setq start end))
-      )
+        (setq start end)))
     (when (> (length str) start)
       (let ((length (- (length str) start)))
         (when (> length longest)
@@ -98,44 +98,39 @@ typeface to be used and wide/narrow chars width.
    ))
 
 
+(defun yk-run-external-command (command term)
+  "Run COMMAND with TERM appended as final argument.
+COMMAND is a list of (program arg1 arg2 ...).
+Returns the command output as a string, or nil on error."
+  (if (and term (> (length term) 0))
+      (with-temp-buffer
+        (let ((exit-code (apply #'call-process
+                                (car command) nil t nil
+                                (append (cdr command) (list term)))))
+          (if (= exit-code 0)
+              (buffer-string)
+            (format "Command failed (exit %d): %s"
+                    exit-code (buffer-string)))))
+    "no term given"))
+
 (defun yk-run-dictionary (term)
-  ;; run dictionary and return its output
-  ;; TODO probably needs error management...
-  
-  (if (> (length term) 0)
-      ;; replace single quotes as they would create errors
-      (shell-command-to-string (format  yk-dict-command
-                                        (replace-regexp-in-string "'" "" term)                                        
-                                        ))
-    "no term given"
-    ))
+  "Run dictionary lookup for TERM, return output string."
+  (yk-run-external-command yk-dict-command term))
 
 (defun yk-run-kanji-dictionary (term)
-  ;; run kanji dictionary and return its output
-  ;; TODO probably needs error management...
-  
-  (if (> (length term) 0)
-      ;; replace single quotes as they would create errors
-      (shell-command-to-string (format  yk-kanji-dict-command
-                                        (replace-regexp-in-string "'" "" term)                                        
-                                        ))
-    "no term given"
-    ))
+  "Run kanji dictionary lookup for TERM, return output string."
+  (yk-run-external-command yk-kanji-dict-command term))
 
 
 (defun yk-show-definition (term definition)
-  ;; show the definition:
-  ;;    1. tooltip
-  ;;    2. append to tango buffer
-  
+  "Show DEFINITION for TERM as tooltip, message, and in tango buffer."
   (yk-tip-show definition)
   (message definition)
   (with-current-buffer (get-buffer-create yk-tango-buffer-name)
-    ;; append and update pointer, so it "follows" the lookups
     (goto-char (point-max))
     (insert (format yk-tango-entry-format term definition))
-    (set-window-point (get-buffer-window) (point-max))
-    ))
+    (when-let ((win (get-buffer-window)))
+      (set-window-point win (point-max)))))
 
 (defun yk-extract-word-at-point ()
   "Extract the word at point and return it as a string. Only useful for non jp words"
