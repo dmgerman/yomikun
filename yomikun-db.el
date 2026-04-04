@@ -16,6 +16,7 @@
 ;;; Code:
 
 (require 'emacsql)
+(require 'emacsql-sqlite)
 
 ;;; --- Configuration ---
 

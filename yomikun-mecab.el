@@ -80,10 +80,12 @@ Adding a new dictionary requires only adding an entry here.")
   "Detect which dictionary mecab is configured to use.
 Runs `mecab -D' and matches the output against registry patterns.
 Returns the dictionary type symbol (e.g., `unidic') or signals an error."
-  (let ((output (yk-mecab--run-command
-                 (append (list yk-mecab-binary "-D")
-                         (when yk-mecab-dict-dir
-                           (list "-d" yk-mecab-dict-dir))))))
+  (let ((output (with-temp-buffer
+                  (apply #'call-process yk-mecab-binary nil t nil
+                         (append (list "-D")
+                                 (when yk-mecab-dict-dir
+                                   (list "-d" yk-mecab-dict-dir))))
+                  (buffer-string))))
     (or (cl-some
          (lambda (entry)
            (let ((pattern (cdr (assq 'detect-pattern (cdr entry)))))
