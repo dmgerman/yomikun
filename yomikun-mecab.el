@@ -74,12 +74,33 @@ Each entry maps a dictionary type symbol to an alist with:
 
 Adding a new dictionary requires only adding an entry here.")
 
+;;; --- Configuration Validation ---
+
+(defun yk-mecab--validate-binary ()
+  "Verify that `yk-mecab-binary' points to an executable.
+Signals an error with a helpful message if not found."
+  (unless (executable-find yk-mecab-binary)
+    (error "Yomikun: mecab binary not found: '%s'.  \
+Set `yk-mecab-binary' to the path of your mecab installation, \
+or install mecab (e.g., brew install mecab mecab-ipadic)"
+           yk-mecab-binary)))
+
+(defun yk-mecab--validate-dict-dir ()
+  "Verify that `yk-mecab-dict-dir' points to an existing directory, if set."
+  (when (and yk-mecab-dict-dir
+             (not (file-directory-p yk-mecab-dict-dir)))
+    (error "Yomikun: mecab dictionary directory does not exist: '%s'.  \
+Set `yk-mecab-dict-dir' to a valid path or nil for the default dictionary"
+           yk-mecab-dict-dir)))
+
 ;;; --- Dictionary Detection ---
 
 (defun yk-mecab--detect-dict-type ()
   "Detect which dictionary mecab is configured to use.
 Runs `mecab -D' and matches the output against registry patterns.
 Returns the dictionary type symbol (e.g., `unidic') or signals an error."
+  (yk-mecab--validate-binary)
+  (yk-mecab--validate-dict-dir)
   (let ((output (with-temp-buffer
                   (apply #'call-process yk-mecab-binary nil t nil
                          (append (list "-D")
@@ -106,7 +127,12 @@ Auto-detects dictionary type if `yk-mecab-dict-type' is nil."
 
 (defun yk-mecab--build-args (input-file)
   "Build the argument list for mecab processing INPUT-FILE.
-Returns a list of strings suitable for `call-process' or `make-process'."
+Returns a list of strings suitable for `call-process' or `make-process'.
+Signals an error if configuration is invalid."
+  (yk-mecab--validate-binary)
+  (yk-mecab--validate-dict-dir)
+  (unless (file-exists-p input-file)
+    (error "Yomikun: input file does not exist: %s" input-file))
   (let ((config (yk-mecab--get-dict-config)))
     (append
      (list (format "--node-format=%s" (cdr (assq 'node-format config)))
@@ -160,8 +186,10 @@ Returns nil for empty lines or lines that cannot be parsed."
                (surface     (nth 4 fields))
                (byte-start  (string-to-number (nth 5 fields)))
                (byte-end    (string-to-number (nth 6 fields)))
-               (char-start  (aref byte-to-char byte-start))
-               (char-end    (aref byte-to-char byte-end)))
+               (char-start  (and (< byte-start (length byte-to-char))
+                                 (aref byte-to-char byte-start)))
+               (char-end    (and (< byte-end (length byte-to-char))
+                                 (aref byte-to-char byte-end))))
           ;; Skip empty or unparseable entries
           (when (and char-start char-end (> (length seen) 0))
             (list 'seen    seen

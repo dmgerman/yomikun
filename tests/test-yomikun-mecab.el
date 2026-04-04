@@ -141,7 +141,11 @@
 (describe "yk-mecab--build-args"
   (before-each
     (setq yk-mecab-dict-type 'unidic)
-    (setq yk-mecab-dict-dir nil))
+    (setq yk-mecab-dict-dir nil)
+    ;; Bypass validation since we test arg construction, not config
+    (spy-on 'yk-mecab--validate-binary)
+    (spy-on 'yk-mecab--validate-dict-dir)
+    (spy-on 'file-exists-p :and-return-value t))
 
   (after-each
     (setq yk-mecab-dict-type nil)

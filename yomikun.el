@@ -541,17 +541,19 @@ When CALLBACK is non-nil, it is called after processing completes."
   )
 
 (defun yk-do-all-compounds ()
+  "Find and mark all compound terms in the buffer.
+Requires the dictionary database to be configured."
   (interactive)
-  (setq yk-compound-occurences 0)
-  (yk-morphs-delete-overlays-at-pos 'yomikun-comp (point-min) (point-max))
-  (yk-db-dict-open)
-  (with-silent-modifications 
-    (yk-morph-do-phrases
-     (lambda (pos) t)
-     'yk-process-compounds-in-phrase
-     ))
-  (message "Done. Found [%s] compounds" yk-compound-occurences)
-  )
+  (if (not yk-db-dict-file)
+      (message "Yomikun: `yk-db-dict-file' not configured, skipping compound detection.")
+    (setq yk-compound-occurences 0)
+    (yk-morphs-delete-overlays-at-pos 'yomikun-comp (point-min) (point-max))
+    (yk-db-dict-open)
+    (with-silent-modifications
+      (yk-morph-do-phrases
+       (lambda (pos) t)
+       'yk-process-compounds-in-phrase))
+    (message "Done. Found [%s] compounds" yk-compound-occurences)))
 
 
 
@@ -949,7 +951,13 @@ Uses `yomikun-mecab' for parsing with byte-offset based position mapping.
 Processing is asynchronous — Emacs remains responsive during mecab execution.
 When CALLBACK is non-nil, it is called with no arguments in the source
 buffer after tokens have been applied."
-  (let* ((input-text (buffer-substring-no-properties beg end))
+  (yk-mecab--validate-binary)
+  (yk-mecab--validate-dict-dir)
+  (if (= beg end)
+      (progn
+        (message "Yomikun: empty region, nothing to process.")
+        (when callback (funcall callback)))
+    (let* ((input-text (buffer-substring-no-properties beg end))
          (temp-file (yk-mecab--write-temp-file input-text))
          (source-buffer (current-buffer))
          (args (yk-mecab--build-args temp-file))
@@ -961,8 +969,9 @@ buffer after tokens have been applied."
                     :command (cons yk-mecab-binary args)
                     :sentinel
                     (lambda (proc event)
-                      (when (string-match-p "finished" event)
-                        (unwind-protect
+                      (unwind-protect
+                          (cond
+                           ((string-match-p "finished" event)
                             (let ((output (with-current-buffer (process-buffer proc)
                                             (buffer-substring-no-properties
                                              (point-min) (point-max)))))
@@ -972,11 +981,13 @@ buffer after tokens have been applied."
                                   (yk-debug-message "Parsed %d tokens" (length tokens))
                                   (yk-process-tokens tokens))
                                 (when callback
-                                  (funcall callback))))
-                          (when (buffer-live-p proc-buffer)
-                            (kill-buffer proc-buffer))
-                          (when (file-exists-p temp-file)
-                            (delete-file temp-file))))))))
+                                  (funcall callback)))))
+                           (t
+                            (message "Yomikun: mecab process failed: %s" (string-trim event))))
+                        (when (buffer-live-p proc-buffer)
+                          (kill-buffer proc-buffer))
+                        (when (file-exists-p temp-file)
+                          (delete-file temp-file))))))))
       (yk-debug-message "Mecab process started"))))
 
 (defun yk-visit-site-with-param (base-url parm)

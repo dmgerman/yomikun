@@ -70,14 +70,18 @@ so shorter first lines would truncate longer subsequent lines."
 COMMAND is a list of (program arg1 arg2 ...).
 Returns the command output as a string."
   (if (and term (> (length term) 0))
-      (with-temp-buffer
-        (let ((exit-code (apply #'call-process
-                                (car command) nil t nil
-                                (append (cdr command) (list term)))))
-          (if (= exit-code 0)
-              (buffer-string)
-            (format "Command failed (exit %d): %s"
-                    exit-code (buffer-string)))))
+      (let ((program (car command)))
+        (unless (executable-find program)
+          (error "Yomikun: command not found: '%s'.  \
+Install it or update the command configuration" program))
+        (with-temp-buffer
+          (let ((exit-code (apply #'call-process
+                                  program nil t nil
+                                  (append (cdr command) (list term)))))
+            (if (= exit-code 0)
+                (buffer-string)
+              (format "Command failed (exit %d): %s"
+                      exit-code (buffer-string))))))
     "no term given"))
 
 (defun yk-run-dictionary (term)
@@ -97,7 +101,7 @@ Returns the command output as a string."
   (with-current-buffer (get-buffer-create yk-tango-buffer-name)
     (goto-char (point-max))
     (insert (format yk-tango-entry-format term definition))
-    (when-let ((win (get-buffer-window)))
+    (when-let* ((win (get-buffer-window)))
       (set-window-point win (point-max)))))
 
 ;;; --- Text Extraction ---

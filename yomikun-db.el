@@ -59,6 +59,8 @@
 (defun yk-db-status-open ()
   "Open the status database, creating a connection if needed."
   (interactive)
+  (unless yk-db-status-file
+    (error "Yomikun: `yk-db-status-file' is not configured"))
   (unless (file-exists-p yk-db-status-file)
     (signal 'file-error (list "Status database does not exist" yk-db-status-file)))
   (unless yk-db-status
@@ -67,6 +69,8 @@
 (defun yk-db-dict-open ()
   "Open the dictionary database, creating a connection if needed."
   (interactive)
+  (unless yk-db-dict-file
+    (error "Yomikun: `yk-db-dict-file' is not configured"))
   (unless (file-exists-p yk-db-dict-file)
     (signal 'file-error (list "Dictionary database does not exist" yk-db-dict-file)))
   (unless yk-db-dict
@@ -96,6 +100,16 @@
 
 ;;; --- Status Database: Low-Level ---
 
+(defun yk-db--ensure-status-open ()
+  "Ensure the status database connection is open, signaling if not."
+  (unless yk-db-status
+    (error "Yomikun: status database is not open.  Call `yk-db-status-open' first")))
+
+(defun yk-db--ensure-dict-open ()
+  "Ensure the dictionary database connection is open, signaling if not."
+  (unless yk-db-dict
+    (error "Yomikun: dictionary database is not open.  Call `yk-db-dict-open' first")))
+
 (defun yk-get-time-date ()
   "Return the current time formatted per `yk-date-format'."
   (format-time-string yk-date-format (current-time)))
@@ -103,6 +117,7 @@
 (defun yk-db-morph-status-get (root wtype surface)
   "Return the status record matching ROOT, WTYPE, SURFACE.
 Returns a list (morph mtype status date) or a default unknown record."
+  (yk-db--ensure-status-open)
   (or (nth 0
        (emacsql yk-db-status [:select [morph mtype status date]
                                       :from words
@@ -112,6 +127,7 @@ Returns a list (morph mtype status date) or a default unknown record."
 
 (defun yk-db-morph-status-delete (root wtype surface)
   "Delete the morph record matching ROOT, WTYPE, SURFACE."
+  (yk-db--ensure-status-open)
   (emacsql yk-db-status [:delete
                           :from words
                           :where (and (= morph $s1) (= mtype $s2) (= surface $s3))]
@@ -119,6 +135,7 @@ Returns a list (morph mtype status date) or a default unknown record."
 
 (defun yk-db-morph-status-insert (root wtype surface status)
   "Insert a new morph record with ROOT, WTYPE, SURFACE, STATUS."
+  (yk-db--ensure-status-open)
   (let ((today (yk-get-time-date)))
     (emacsql yk-db-status [:insert :into words
                             :values ([$s1 $s2 $s3 $s4 $s5])]
@@ -154,6 +171,7 @@ Only writes to the database if the status actually changed."
   "Look up a dictionary definition for ROOT, PRONUN, WTYPE.
 Tries progressively broader searches: all three fields, then root+pronun,
 then root alone."
+  (yk-db--ensure-dict-open)
   (let* ((with-all (nth 0
                     (emacsql yk-db-dict [:select [gloss pos root reading wtype]
                                                  :from entries
@@ -187,6 +205,7 @@ then root alone."
 
 (defun yk-db-compound-prefix-candidates (st)
   "Return a list of compounds that have ST as a prefix."
+  (yk-db--ensure-dict-open)
   (when (> (length st) 2)
     (let ((pattern (concat st "%")))
       (mapcar
@@ -205,6 +224,7 @@ then root alone."
 
 (defun yk-db-compound-exists (st)
   "Return non-nil if compound ST exists in the dictionary."
+  (yk-db--ensure-dict-open)
   (and
    (emacsql yk-db-dict [:select [compound]
                                 :from compounds
