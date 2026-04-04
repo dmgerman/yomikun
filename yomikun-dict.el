@@ -43,10 +43,11 @@
 ;;; --- Tooltip Display ---
 
 (defun yk-pad-first-line (str)
-  "Pad first line of STR to the width of the longest line.
-On macOS, pos-tip tooltips are as wide as the first line,
-so shorter first lines would truncate longer subsequent lines."
-  (let* ((lines (split-string str "\n"))
+  "Prepare STR for display in a pos-tip tooltip.
+Pads the first line to the width of the longest content line.
+Appends two trailing blank lines to compensate for pos-tip cropping."
+  (let* ((trimmed (string-trim-right str))
+         (lines (split-string trimmed "\n"))
          (max-width (apply #'max (mapcar #'string-width lines)))
          (first-width (string-width (car lines)))
          (padding (max 0 (- max-width first-width))))
@@ -54,13 +55,13 @@ so shorter first lines would truncate longer subsequent lines."
         (concat (car lines)
                 (make-string padding ?\s)
                 "\n"
-                (mapconcat #'identity (cdr lines) "\n"))
+                (mapconcat #'identity (cdr lines) "\n")
+                "\n \n ")
       str)))
 
 (defun yk-tip-show (msg)
-  "Display MSG in a tooltip near point.
-Catches errors from pos-tip to avoid breaking cursor-sensor callbacks."
-  (condition-case err
+  "Display MSG in a tooltip near point."
+  (condition-case nil
       (pos-tip-show (yk-pad-first-line msg)
                     nil nil nil
                     yk-tooltip-timeout)

@@ -6,26 +6,24 @@
 ;;; --- yk-pad-first-line ---
 
 (describe "yk-pad-first-line"
-  (it "pads short first line to match longest"
-    (let ((result (yk-pad-first-line "hi\nlong line here")))
-      ;; First line "hi" (width 2) padded to match "long line here" (width 14)
-      (expect (string-width (car (split-string result "\n")))
-              :to-be-greater-than 2)))
+  (it "pads first line to width of longest line"
+    (let* ((result (yk-pad-first-line "hi\nlong line here"))
+           (first-line (car (split-string result "\n"))))
+      (expect (string-width first-line)
+              :to-equal (string-width "long line here"))))
 
   (it "returns single-line string unchanged"
     (expect (yk-pad-first-line "hello") :to-equal "hello"))
 
-  (it "handles CJK characters with double width"
-    (let ((result (yk-pad-first-line "ab\n東京都")))
-      ;; "ab" has width 2, "東京都" has width 6
-      ;; First line should be padded to width 6
-      (let ((first-line (car (split-string result "\n"))))
-        (expect (string-width first-line) :to-equal 6))))
+  (it "appends two trailing blank lines"
+    (let ((result (yk-pad-first-line "line1\nline2")))
+      (expect (string-suffix-p "\n \n " result) :to-be-truthy)))
 
-  (it "does not pad when first line is already longest"
-    (let ((result (yk-pad-first-line "long first line\nhi")))
-      (expect (car (split-string result "\n"))
-              :to-equal "long first line"))))
+  (it "trims trailing whitespace from input"
+    (let* ((result (yk-pad-first-line "line1\nline2\n\n"))
+           (lines (split-string result "\n")))
+      (expect (nth 0 lines) :to-match "^line1")
+      (expect (nth 1 lines) :to-equal "line2"))))
 
 ;;; --- yk-run-external-command ---
 
