@@ -25,17 +25,26 @@
 
 ;;; --- Configuration ---
 
-(defvar yk-mecab-binary "mecab"
+(defcustom yk-mecab-binary "mecab"
   "Path to the mecab executable.
-Can be an absolute path or a command name found via PATH.")
+Can be an absolute path or a command name found via PATH."
+  :type 'string
+  :group 'yomikun)
 
-(defvar yk-mecab-dict-dir nil
+(defcustom yk-mecab-dict-dir nil
   "Path to mecab dictionary directory.
-When nil, mecab uses its compiled-in default dictionary.")
+When nil, mecab uses its compiled-in default dictionary."
+  :type '(choice (const :tag "Use default" nil)
+                 (directory :tag "Dictionary directory"))
+  :group 'yomikun)
 
-(defvar yk-mecab-dict-type nil
+(defcustom yk-mecab-dict-type nil
   "Dictionary type symbol: `unidic', `ipadic', or nil for auto-detection.
-When nil, `yk-mecab--detect-dict-type' is called to determine the type.")
+When nil, `yk-mecab--detect-dict-type' is called to determine the type."
+  :type '(choice (const :tag "Auto-detect" nil)
+                 (const :tag "UniDic" unidic)
+                 (const :tag "IPAdic" ipadic))
+  :group 'yomikun)
 
 ;;; --- Dictionary Registry ---
 
@@ -213,6 +222,7 @@ ARGS is a list where the first element is the program."
 
 ;;; --- Diagnostics ---
 
+;;;###autoload
 (defun yk-doctor ()
   "Run diagnostic checks on the yomikun/mecab configuration.
 Opens a *yomikun-doctor* buffer with results."

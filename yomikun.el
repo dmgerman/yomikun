@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 2023 daniel german (dmg@turingmachine.org)
+;; Copyright (C) 2023 Daniel M German (dmg@turingmachine.org)
 
 ;; overlay code based on https://github.com/katspaugh/kuromoji.el
 ;; used with permission
@@ -10,24 +10,46 @@
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;; Version: 0.2
 ;; Homepage: https://github.com/dmgerman/yomikun
-;; Package-Requires: ((emacs "27.1") )
+;; Package-Requires: ((emacs "27.1"))
 
+;;; Commentary:
 
+;; Yomikun brings yomichan/migaku-style features to Emacs for learning
+;; Japanese.  It tokenizes Japanese text using mecab, tracks reading
+;; status of words (known/unknown/learning/ignored), provides overlay
+;; information about current tokens, and integrates dictionary support.
 
+;;; Code:
 
 (require 'pos-tip)
 (require 'cl-lib)
 (require 'yomikun-db)
 (require 'yomikun-mecab)
 
-(defvar yk-debug nil "Enable debug messages when non-nil")
+;;; --- Customization Group ---
+
+(defgroup yomikun nil
+  "Japanese reading assistant using mecab."
+  :group 'text
+  :prefix "yk-")
+
+;;; --- Configuration ---
+
+(defcustom yk-debug nil
+  "Enable debug messages when non-nil."
+  :type 'boolean
+  :group 'yomikun)
 
 (defmacro yk-debug-message (format-string &rest args)
-  "Print debug message if yk-debug is non-nil."
+  "Print debug message if `yk-debug' is non-nil."
   `(when yk-debug
      (message ,format-string ,@args)))
 
-(defvar yk-max-tokens-to-process 10000)
+(defcustom yk-max-tokens-to-process 10000
+  "Maximum number of tokens to process per invocation.
+Safety limit to prevent runaway processing on huge buffers."
+  :type 'integer
+  :group 'yomikun)
 
 
 (defvar yk-report-buffer "*yk-report*" "Name of buffer for report")
@@ -41,12 +63,14 @@
        (char-to-string c)))
    str ""))
 
+;;;###autoload
 (defun yk-do-region (beg end)
   "Process the region through mecab, applying morphological overlays."
   (interactive "r")
   (yk-remove-props-and-overlays beg end)
   (yk-process-region beg end))
 
+;;;###autoload
 (defun yk-do-buffer ()
   "Process the entire buffer through mecab."
   (interactive)
@@ -1037,6 +1061,7 @@ Processing is asynchronous — Emacs remains responsive during mecab execution."
 (define-key yk-minor-map (kbd "m") 'yk-kanji-damage-at-point)
 (define-key yk-minor-map (kbd "x") 'yk-disable-mode)
 
+;;;###autoload
 (define-minor-mode yk-minor-mode
   "my help"
 

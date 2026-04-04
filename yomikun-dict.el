@@ -19,11 +19,15 @@
 
 ;;; --- Configuration ---
 
-(defvar yk-dict-command '("myougiden" "--human")
-  "Command and arguments for dictionary lookup.  Term is appended.")
+(defcustom yk-dict-command '("myougiden" "--human")
+  "Command and arguments for dictionary lookup.  Term is appended."
+  :type '(repeat string)
+  :group 'yomikun)
 
-(defvar yk-kanji-dict-command '("kanji-dict.py")
-  "Command and arguments for kanji lookup.  Term is appended.")
+(defcustom yk-kanji-dict-command '("kanji-dict.py")
+  "Command and arguments for kanji lookup.  Term is appended."
+  :type '(repeat string)
+  :group 'yomikun)
 
 (defvar yk-tango-buffer-name "*yk-tango*"
   "Buffer name for the lookup log.")
@@ -31,8 +35,10 @@
 (defvar yk-tango-entry-format "\n\n\n----Term: %s\n%s"
   "Format for log entries.  First %s is the term, second is the definition.")
 
-(defvar yk-tooltip-timeout 10
-  "How long to display tooltips, in seconds.")
+(defcustom yk-tooltip-timeout 10
+  "How long to display tooltips, in seconds."
+  :type 'integer
+  :group 'yomikun)
 
 ;;; --- Tooltip Display ---
 

@@ -19,11 +19,17 @@
 
 ;;; --- Configuration ---
 
-(defvar yk-db-status-file "~/yk-status.db"
-  "Path to the SQLite status database file.")
+(defcustom yk-db-status-file "~/yk-status.db"
+  "Path to the SQLite status database file."
+  :type '(choice (const :tag "Not configured" nil)
+                 (file :tag "Database file"))
+  :group 'yomikun)
 
-(defvar yk-db-dict-file nil
-  "Path to the SQLite dictionary database file.")
+(defcustom yk-db-dict-file nil
+  "Path to the SQLite dictionary database file."
+  :type '(choice (const :tag "Not configured" nil)
+                 (file :tag "Database file"))
+  :group 'yomikun)
 
 (defvar yk-date-format "%Y-%m-%d %H:%M"
   "Format to use when logging timestamps to the status database.")
