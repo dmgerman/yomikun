@@ -18,12 +18,7 @@
 (require 'pos-tip)
 (require 'cl-lib)
 (require 'yomikun-db)
-
-(defvar yk-mecab-command "echo" "Shell command to run on buffer contents")
-(defvar yk-process-name "jp-process")
-
-;; string used by emacs to delimit end of process
-(defvar yk-process-end-st "\nProcess")
+(require 'yomikun-mecab)
 
 (defvar yk-debug nil "Enable debug messages when non-nil")
 
@@ -35,7 +30,6 @@
 (defvar yk-max-tokens-to-process 10000)
 
 
-(defvar yk-process-buffer "*yk-process*" "Name of buffer for shell command process")
 (defvar yk-report-buffer "*yk-report*" "Name of buffer for report")
 
 (defun yk-katakana-to-hiragana (str)
@@ -48,20 +42,13 @@
    str ""))
 
 (defun yk-do-region (beg end)
-  "jk-ize the region"
+  "Process the region through mecab, applying morphological overlays."
   (interactive "r")
-  ;; remove current info in region
   (yk-remove-props-and-overlays beg end)
-  
-  (if (bufferp yk-process-buffer)
-      (kill-buffer yk-process-buffer))
-
-  ;; do the work
-  (yk-process-region beg end)
-  )
+  (yk-process-region beg end))
 
 (defun yk-do-buffer ()
-  "jk-ize the region"
+  "Process the entire buffer through mecab."
   (interactive)
   (yk-do-region (point-min) (point-max))
   )
@@ -944,229 +931,19 @@ The list is sorted using COMPARE-FUNC to compare elements."
     )
   )
 
-(defun yk-process-filter (beg end output)
-  "Process OUTPUT from mecab one line at a time using jp-process."
-  (yk-debug-message "Starting [%s]" (yk-until-eoln output))
-  (let* (
-         (lines (split-string output "\n" t))
-         (tokens  (mapcar #'yk-mecab-process-line lines))         ;
-         )
-    (yk-sync-list-to-st
-     tokens
-     (buffer-substring-no-properties beg end)
-     beg
-     )
-    ))
-
-(defun yk-process-root-for-kana (morph)
-  "When the morph is a Kana word, mecab returns the word and
-its romagi equivalent. For example: the root of ドーム
-is ドーム-dome. This function removes the romagi if it exists"
-  (if (and morph (cl-position ?- morph))
-      ;; if we have a morph with -
-    (let* (
-           (pos  (cl-position ?- morph))
-           (romagi (and pos (substring morph (+ 1 pos)))))
-      (if (and romagi (string-match-p "^[a-zA-Z]+$" romagi))
-          (substring morph 0 pos) ;; kana part
-        morph)) ;; else of if
-    morph)) ;; else of if
-
-(defun yk-mecab-process-line (line)
-  "maps a mecab output line into a pair (surface properties)
-Properties is a property-list with information about the 
-"
-  (let* (
-       (textpair (and line (split-string line "\t")))
-       (seen     (nth 0 textpair))
-       (info     (nth 1 textpair))
-       (infolist (and info (split-string info ",")))
-       (wtype   (and infolist (nth 0 infolist)))
-       (root    (and infolist (nth 7 infolist)))
-       (root-clean (yk-process-root-for-kana root))
-       (pronun  (and infolist (nth 9 infolist)))
-       (surface (and infolist (nth 10 infolist)))
-       )
-  (progn
-    (if (string-equal "EOS" seen)  ; EOS is a line end
-        (setq seen "\n"))
-;    (message "Line [%s] surface [%s]" line surface)
-    (list 'seen seen 'surface surface 'wtype wtype 'root root-clean 'pronun pronun)
-    ))
-)
-
-(defun yk-list-add-running-length (pairs)
-  "Convert a list of pairs of strings to a list of lists of three elements,
-    Each list has 3 elements: the accumulative sum of the length of the first
-  string of the input pairs, the first string in the pair, and the third string
-  in the pair."
-  (let ((running-lengths ())
-        (accumulative-length 0))
-    (dolist (pair pairs)
-      (setq accumulative-length (+ accumulative-length (string-width (car pair))))
-      (setq running-lengths (append running-lengths
-                                    (list (list
-                                           (- accumulative-length -1 (length (car pair)))
-                                           accumulative-length (car pair) (nth 1 pair))))))
-    running-lengths))
-
-(defun yk-sync-list-to-st (lst st regionOffset)
-  "Unfortunately mecab does not output all characters (e.g. spaces). This means
-  we need to find out where in the text each token is.
-
-  This function returns a set of tokens that include the position (beg, end) where
-  they occur.
-
-"
-  (yk-debug-message "entering [%s]" (yk-until-eoln st))
-  (yk-debug-message "%s " (car lst))
-  (let (
-        (output (list))
-        (counter 0)
-        (offset 0)
-        (lenSt (length st))
-      )
-    (progn
-      (while (and (> lenSt offset)
-                  (not (null lst)))
-        (let* (
-               (nextToken (nth 0 lst))
-               (next      (plist-get nextToken 'seen))
-               (wtype (plist-get nextToken 'wtype))
-               (nextLen   (length next))
-               (prefix    (substring st offset (+ nextLen offset)))
-               )
-;          (message "entering iteration %d offset %d lenSt %d len tokens [%d] next [%s]" counter offset lenSt (length lst) (nth 0 lst))
-          (if (< counter yk-max-tokens-to-process)
-            ;; just in case we get into an infinite loop, or the input is humongous
-              (progn
-                (setq counter (+ counter 1))
-  ;              (message "[%d]current string [%d] [%s]" counter offset (yk-until-eoln (substring st offset)))
-;                (message "    next token [%s]" nextToken)
-;                (message "    prefix [%s] -> next [%s] nextLen [%d]" prefix next nextLen)
-                (if (string-equal next prefix ) ; test matches
-                    (let ((endpos (+ offset nextLen ))
-                          ) 
-                      (progn
-                        ;; ignore punctuation
-                        (when (not (equal wtype "補助記号"))
-                            (plist-put nextToken 'begin (+ offset regionOffset))
-                          (plist-put nextToken 'end   (+ endpos regionOffset -1))
-                          (push nextToken output))
-                        ;;(add-to-list 'output nextToken t)
-;                        (message "    + it matches!! offset %d [%s]" offset nextToken)
-                        (setq lst (cdr lst))
-                        (setq offset (+ offset nextLen))
-                        ))
-                  ;;; does not match
-                  (let* (
-                         ;; search from offset for the next token
-                         ;; TODO: do not add a new token, it is not needed.
-                         ;;     simply advance the character being inspected
-                         (skip (cl-search next (substring st offset))) ;; text that is skipped
-                         ;;(newSeen (substring st offset (+ skip offset)))
-                         ;;(endpos (+ position skip -1))
-                         ;; the next line is not really necessary
-                         ;; unless we require that the list of tokens
-                         ;; represent ALL the text (i.e. the text
-                         ;; can be regenerated from the tokens)
-;                         (newToken (list 'surface newSeen 'seen newSeen 'begin position 'end endpos 'wtype "other"))
-                         )
-                    (progn
-                      (if (not skip)
-                          (error "something went wrong. Unable to match mecab to text") 
-                          )
-                      (setq offset (+ offset skip))
-;                      (message "   > does not match. skip [%d] offset after [%d]" skip offset)
-                      )))
-                )
-           
- ;           (message ">>>> to start another iteration [%d] [%s]" offset (nth 0 lst))
-          ))
-        )
-      ;; left over string... 
-      ;; but if there is text left, we don't care for it
-      (nreverse output)
-      )))
-
-(defun yk-process-mecab (beg end mecabBuffer)
-  "Process mecab output mecab on region.
-
-  buffer is the process output from mecab
-
-  1. synchronize text and mecab
-  2. Process mecab records
-     for reach line in mecab, create a token
-  3. process each token
-     - add properties and overlay
-
-"
-  (let*
-      (
-       ;; get raw mecab output
-       (output (with-current-buffer mecabBuffer
-                 (buffer-substring-no-properties (point-min) (point-max))))
-       ;; save mecab output, remove end-of-process message
-       (outputMecab (substring output 0 (string-match yk-process-end-st output)))
-       ;; separate tokens
-       (jpTokens (yk-process-filter beg end outputMecab))
-       )
-    (yk-debug-message "finished mecab processing %d tokens" (length jpTokens))
-;    (message "[%s]" jpTokens )
-    ;; process the tokens
-    (yk-process-tokens jpTokens)
-    )
-  )
-
-(defun yk-create-temp-file-from-string (string)
-  (let ((temp-file (make-temp-file "tmp-string-")))
-    (with-temp-file temp-file
-      (insert string))
-    temp-file))
-
-(defun yk-create-simple-buffer (name)
-  (let ((buffer (generate-new-buffer name)))
-    (buffer-disable-undo buffer)
-;    (with-current-buffer buffer
-;      (progn
-;        (setq buffer-undo-list nil)
-;        (mapc (lambda (x) (funcall x -1))
-;              (yk-active-minor-modes))
-;
-;        )
-;      )
-    buffer
-    )
-  )
-
 (defun yk-process-region (beg end)
-  ;; it run more way faster using an external file as input
-  ;; than piping the text to the process
-  (setq process-adaptive-read-buffering t)
-  (let* (
-         (proc-buffer (yk-create-simple-buffer yk-process-buffer))
-        (temp-file (yk-create-temp-file-from-string (buffer-substring-no-properties beg end)))
-        (process (start-process yk-process-name proc-buffer yk-mecab-command temp-file)
-                 )
-        )
-    (progn
-      ;; async input is buffered and we do not want to process
-      ;; incomplete lines. So wait until all output is created and process it
-      (yk-debug-message "created temp file [%s]" temp-file)
-      (yk-debug-message "process starting")
-
-;      (process-send-region process beg end)
-      (process-send-eof process)
-      (yk-debug-message "process sent")
-      (while (accept-process-output process))
-      (yk-debug-message "mecab Done")
-      (yk-process-mecab beg end proc-buffer)
-      (yk-debug-message "finished processing buffer")
-      (kill-buffer yk-process-buffer)
-      (delete-file temp-file)
-      )      
-    )
-  )
+  "Process the region BEG to END through mecab and apply token overlays.
+Uses `yomikun-mecab' for parsing with byte-offset based position mapping."
+  (let* ((input-text (buffer-substring-no-properties beg end))
+         (temp-file (yk-mecab--write-temp-file input-text)))
+    (unwind-protect
+        (let* ((args (yk-mecab--build-args temp-file))
+               (output (yk-mecab--run-command (cons yk-mecab-binary args)))
+               (tokens (yk-mecab--parse-output output input-text beg)))
+          (yk-debug-message "Parsed %d tokens" (length tokens))
+          (yk-process-tokens tokens))
+      (when (file-exists-p temp-file)
+        (delete-file temp-file)))))
 
 (defun yk-visit-site-with-param (base-url parm)
   (let ((url (format base-url (url-hexify-string parm))))
@@ -1254,8 +1031,5 @@ Properties is a property-list with information about the
   ;; this is where the code goes
   )
 
-
-(defun yk-until-eoln (st)
-  (substring st 0 (string-match "\n" st)))
 
 (provide 'yomikun)
