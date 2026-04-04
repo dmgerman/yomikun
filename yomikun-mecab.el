@@ -231,11 +231,15 @@ Returns a list of token plists ready for `yk-process-tokens'."
 
 (defun yk-mecab--write-temp-file (text)
   "Write TEXT to a temporary file with UTF-8 encoding.
+Newlines are replaced with spaces because mecab treats newlines as
+sentence boundaries and resets byte offsets (%ps/%pe) at each one.
+Since both newline and space are 1 byte in UTF-8, this substitution
+preserves all byte offsets for non-newline characters.
 Returns the temp file path.  Caller is responsible for deletion."
   (let ((temp-file (make-temp-file "yomikun-"))
         (coding-system-for-write 'utf-8))
     (with-temp-file temp-file
-      (insert text))
+      (insert (replace-regexp-in-string "\n" " " text)))
     temp-file))
 
 ;;; --- Process Helpers ---

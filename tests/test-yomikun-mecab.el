@@ -203,6 +203,15 @@
             (expect content :to-equal "東京都"))
         (delete-file temp-file))))
 
+  (it "replaces newlines with spaces to preserve byte offsets"
+    (let ((temp-file (yk-mecab--write-temp-file "東京\n大阪")))
+      (unwind-protect
+          (let ((content (with-temp-buffer
+                           (insert-file-contents temp-file)
+                           (buffer-string))))
+            (expect content :to-equal "東京 大阪"))
+        (delete-file temp-file))))
+
   (it "returns a path that exists"
     (let ((temp-file (yk-mecab--write-temp-file "test")))
       (unwind-protect
