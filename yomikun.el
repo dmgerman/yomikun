@@ -63,18 +63,19 @@ Safety limit to prevent runaway processing on huge buffers."
    str ""))
 
 ;;;###autoload
-(defun yk-do-region (beg end)
-  "Process the region through mecab, applying morphological overlays."
+(defun yk-do-region (beg end &optional callback)
+  "Process the region through mecab, applying morphological overlays.
+When CALLBACK is non-nil, it is called after processing completes."
   (interactive "r")
   (yk-remove-props-and-overlays beg end)
-  (yk-process-region beg end))
+  (yk-process-region beg end callback))
 
 ;;;###autoload
-(defun yk-do-buffer ()
-  "Process the entire buffer through mecab."
+(defun yk-do-buffer (&optional callback)
+  "Process the entire buffer through mecab.
+When CALLBACK is non-nil, it is called after processing completes."
   (interactive)
-  (yk-do-region (point-min) (point-max))
-  )
+  (yk-do-region (point-min) (point-max) callback))
 
 
 ;;;;;;;;;;;;;faces
@@ -938,10 +939,16 @@ The list is sorted using COMPARE-FUNC to compare elements."
     )
   )
 
-(defun yk-process-region (beg end)
+(defun yk-buffer-parsed-p ()
+  "Return non-nil if the current buffer has been parsed by yomikun."
+  (text-property-not-all (point-min) (point-max) 'yk-morph nil))
+
+(defun yk-process-region (beg end &optional callback)
   "Process the region BEG to END through mecab and apply token overlays.
 Uses `yomikun-mecab' for parsing with byte-offset based position mapping.
-Processing is asynchronous — Emacs remains responsive during mecab execution."
+Processing is asynchronous — Emacs remains responsive during mecab execution.
+When CALLBACK is non-nil, it is called with no arguments in the source
+buffer after tokens have been applied."
   (let* ((input-text (buffer-substring-no-properties beg end))
          (temp-file (yk-mecab--write-temp-file input-text))
          (source-buffer (current-buffer))
@@ -963,7 +970,9 @@ Processing is asynchronous — Emacs remains responsive during mecab execution."
                                 (let ((tokens (yk-mecab--parse-output
                                                output input-text beg)))
                                   (yk-debug-message "Parsed %d tokens" (length tokens))
-                                  (yk-process-tokens tokens))))
+                                  (yk-process-tokens tokens))
+                                (when callback
+                                  (funcall callback))))
                           (when (buffer-live-p proc-buffer)
                             (kill-buffer proc-buffer))
                           (when (file-exists-p temp-file)
@@ -1048,13 +1057,23 @@ Processing is asynchronous — Emacs remains responsive during mecab execution."
 (define-minor-mode yk-minor-mode
   "Minor mode for interacting with yomikun-processed Japanese text.
 Provides keybindings for marking word status, looking up definitions,
-and navigating Japanese text."
+and navigating Japanese text.
+
+When activated, automatically parses the buffer and finds compounds
+if the buffer has not already been processed."
   :global nil
   :lighter " yk"
   :keymap yk-minor-map
-  :after-hook (if yk-minor-mode
-                  (cursor-sensor-mode 1)
-                (cursor-sensor-mode -1)))
+  (if yk-minor-mode
+      (if (yk-buffer-parsed-p)
+          (cursor-sensor-mode 1)
+        (message "Yomikun: parsing buffer...")
+        (yk-do-buffer
+         (lambda ()
+           (yk-do-all-compounds)
+           (cursor-sensor-mode 1)
+           (message "Yomikun: ready."))))
+    (cursor-sensor-mode -1)))
 
 (provide 'yomikun)
 ;;; yomikun.el ends here
