@@ -25,8 +25,6 @@ See a demo [[https://youtu.be/vOsyCawWjRc][here]].
 #+begin_src emacs-lisp
 (use-package emacsql :straight t)
 (use-package pos-tip :straight t)
-(use-package yomikun-db    :straight nil :load-path "~/.emacs.d/modules/yomikun")
-(use-package yomikun-mecab  :straight nil :load-path "~/.emacs.d/modules/yomikun")
 (use-package yomikun
   :straight nil
   :load-path "~/.emacs.d/modules/yomikun"
@@ -36,7 +34,6 @@ See a demo [[https://youtu.be/vOsyCawWjRc][here]].
   (setq yk-mecab-dict-type 'ipadic)                   ;; or 'unidic
   (setq yk-db-status-file "~/jp-status.db")
   (setq yk-db-dict-file "~/dictionary.db"))
-(use-package yomikun-dict :straight nil :load-path "~/.emacs.d/modules/yomikun")
 #+end_src
 
 3. Open a Japanese text file
