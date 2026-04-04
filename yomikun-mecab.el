@@ -214,6 +214,59 @@ Mecab UniDic returns kana words with romaji equivalents, e.g.,
           morph))
     morph))
 
+;;; --- Text Chunking ---
+
+(defvar yk-mecab-chunk-byte-limit 7000
+  "Maximum byte size per chunk sent to mecab.
+Mecab resets %ps/%pe byte offsets at internal 8192-byte boundaries.
+We use a lower limit to ensure no chunk crosses that boundary.")
+
+(defun yk-mecab--split-into-chunks (text)
+  "Split TEXT into chunks that fit within `yk-mecab-chunk-byte-limit'.
+Returns a list of (chunk-string . char-offset) pairs.
+Splits at the last space/newline before the byte limit."
+  (let ((chunks nil)
+        (char-offset 0)
+        (text-len (length text)))
+    (while (< char-offset text-len)
+      (let* ((remaining (substring text char-offset))
+             (remaining-bytes (string-bytes remaining)))
+        (if (<= remaining-bytes yk-mecab-chunk-byte-limit)
+            ;; Entire remainder fits in one chunk
+            (progn
+              (push (cons remaining char-offset) chunks)
+              (setq char-offset text-len))
+          ;; Find a split point: walk forward by chars until we hit the byte limit
+          (let ((chunk-end char-offset)
+                (byte-count 0))
+            (while (and (< chunk-end text-len)
+                        (< byte-count yk-mecab-chunk-byte-limit))
+              (let ((char-bytes (string-bytes
+                                 (substring text chunk-end (1+ chunk-end)))))
+                (setq byte-count (+ byte-count char-bytes)
+                      chunk-end (1+ chunk-end))))
+            ;; Back off one char (we went over the limit)
+            (when (> byte-count yk-mecab-chunk-byte-limit)
+              (setq chunk-end (1- chunk-end)))
+            ;; Try to split at a sentence boundary for cleaner tokenization
+            (let ((split-at (yk-mecab--find-split-point text char-offset chunk-end)))
+              (push (cons (substring text char-offset split-at) char-offset) chunks)
+              (setq char-offset split-at))))))
+    (nreverse chunks)))
+
+(defun yk-mecab--find-split-point (text chunk-start chunk-end)
+  "Find a good split point in TEXT between CHUNK-START and CHUNK-END.
+Prefers splitting after 。, newline, or space.  Falls back to CHUNK-END."
+  (let ((best chunk-end)
+        (pos (1- chunk-end)))
+    (while (and (> pos chunk-start)
+                (= best chunk-end))
+      (let ((ch (aref text pos)))
+        (when (memq ch '(?。 ?\n ?  ?\t))
+          (setq best (1+ pos))))
+      (setq pos (1- pos)))
+    best))
+
 (defun yk-mecab--parse-output (mecab-output input-text region-offset)
   "Parse MECAB-OUTPUT into a list of token plists.
 INPUT-TEXT is the original string that was sent to mecab.
@@ -226,6 +279,29 @@ Returns a list of token plists ready for `yk-process-tokens'."
            (lambda (line)
              (yk-mecab--parse-line line byte-to-char region-offset))
            lines))))
+
+(defun yk-mecab--parse-output-chunked (input-text region-offset)
+  "Parse INPUT-TEXT through mecab in chunks, returning token plists.
+Handles mecab's 8KB byte-offset reset by splitting text into chunks
+that fit within the limit.  REGION-OFFSET is the buffer position
+where INPUT-TEXT starts."
+  (yk-mecab--validate-binary)
+  (yk-mecab--validate-dict-dir)
+  (let* ((chunks (yk-mecab--split-into-chunks input-text))
+         (all-tokens nil))
+    (dolist (chunk chunks)
+      (let* ((chunk-text (car chunk))
+             (char-offset (cdr chunk))
+             (temp-file (yk-mecab--write-temp-file chunk-text))
+             (args (yk-mecab--build-args temp-file))
+             (output (unwind-protect
+                         (yk-mecab--run-command (cons yk-mecab-binary args))
+                       (when (file-exists-p temp-file)
+                         (delete-file temp-file))))
+             (tokens (yk-mecab--parse-output
+                      output chunk-text (+ region-offset char-offset))))
+        (setq all-tokens (nconc all-tokens tokens))))
+    all-tokens))
 
 ;;; --- Temp File Management ---
 

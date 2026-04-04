@@ -254,4 +254,132 @@
         (when (file-exists-p temp-file)
           (delete-file temp-file))))))
 
+;;; --- Chunking tests ---
+
+(describe "yk-mecab--split-into-chunks"
+  (it "returns a single chunk for small text"
+    (let ((chunks (yk-mecab--split-into-chunks "東京都")))
+      (expect (length chunks) :to-equal 1)
+      (expect (car (car chunks)) :to-equal "東京都")
+      (expect (cdr (car chunks)) :to-equal 0)))
+
+  (it "splits large text into multiple chunks"
+    ;; Build a string that exceeds 7000 bytes (Japanese chars = 3 bytes each)
+    ;; 2400 chars * 3 bytes = 7200 bytes > 7000
+    (let* ((base "東京都に住んでいる。")  ;; 10 chars, 28 bytes (9 JP + 1 punct)
+           (repeated (apply #'concat (make-list 250 base)))  ;; 2500 chars
+           (chunks (yk-mecab--split-into-chunks repeated)))
+      (expect (length chunks) :to-be-greater-than 1)
+      ;; Verify offsets are sequential and non-overlapping
+      (let ((prev-end 0))
+        (dolist (chunk chunks)
+          (expect (cdr chunk) :to-equal prev-end)
+          (setq prev-end (+ (cdr chunk) (length (car chunk))))))
+      ;; Verify concatenating all chunks reconstructs the original
+      (let ((reconstructed (mapconcat #'car chunks "")))
+        (expect reconstructed :to-equal repeated))))
+
+  (it "splits at sentence boundaries when possible"
+    (let* ((sentence "東京都に住んでいる。")
+           ;; ~240 sentences * ~28 bytes = ~6720 bytes per chunk
+           (repeated (apply #'concat (make-list 500 sentence)))
+           (chunks (yk-mecab--split-into-chunks repeated)))
+      ;; Each chunk should end at a 。boundary (except possibly the last)
+      (dolist (chunk (butlast chunks))
+        (let ((text (car chunk)))
+          (expect (string-suffix-p "。" text) :to-be-truthy))))))
+
+;;; --- Full file integration test ---
+
+(defvar yk-test--fixture-dir
+  (expand-file-name "fixtures/"
+                    (file-name-directory (or load-file-name buffer-file-name)))
+  "Directory containing test fixture files.")
+
+(describe "full file parsing"
+  :var (mecab-works)
+
+  (before-all
+    (setq mecab-works
+          (and (yk-test-mecab-available-p)
+               (condition-case nil
+                   (progn (yk-mecab--detect-dict-type) t)
+                 (error nil)))))
+
+  (it "parses kumo_no_ito.txt with correct overlay alignment"
+    (assume mecab-works "mecab not available or not configured")
+    (let* ((fixture-file (expand-file-name "kumo_no_ito.txt" yk-test--fixture-dir))
+           ;; Read and duplicate the file content to ensure > 8KB
+           (base-text (with-temp-buffer
+                        (insert-file-contents fixture-file)
+                        (buffer-string)))
+           (text (concat base-text "\n" base-text))
+           (temp-db (make-temp-file "yomikun-test-" nil ".db"))
+           (saved-status-file yk-db-status-file)
+           (saved-db-status yk-db-status))
+      (unwind-protect
+          (progn
+            ;; Set up temp DB
+            (delete-file temp-db)
+            (setq yk-db-status-file temp-db)
+            (setq yk-db-status nil)
+            (yk-db-status-create)
+            (clrhash yk-status-table)
+
+            (with-temp-buffer
+              (insert text)
+              (let ((buf-size (point-max)))
+                ;; Process the buffer
+                (yk-do-region (point-min) (point-max))
+
+                ;; 1. Verify parsing covers the full buffer
+                (let ((last-morph nil))
+                  (let ((pos (1- buf-size)))
+                    (while (and (> pos 0) (not last-morph))
+                      (when (get-text-property pos 'yk-morph)
+                        (setq last-morph pos))
+                      (setq pos (1- pos))))
+                  (expect last-morph :to-be-truthy)
+                  ;; Last morph should be within 20 chars of end
+                  (expect last-morph :to-be-greater-than (- buf-size 20)))
+
+                ;; 2. Verify overlays exist and cover parsed regions
+                (let ((overlay-count (length (overlays-in (point-min) (point-max)))))
+                  (expect overlay-count :to-be-greater-than 100))
+
+                ;; 3. Verify the 'seen' property matches the actual buffer text
+                ;;    at every morph position (this catches byte-offset misalignment)
+                (let ((mismatches 0)
+                      (checked 0))
+                  (let ((pos (point-min)))
+                    (while pos
+                      (when (get-text-property pos 'seen)
+                        (let* ((seen (get-text-property pos 'seen))
+                               (end-prop (get-text-property pos 'end))
+                               (actual (buffer-substring-no-properties
+                                        pos (min (+ pos (length seen)) buf-size))))
+                          (setq checked (1+ checked))
+                          (unless (string-equal seen actual)
+                            (setq mismatches (1+ mismatches)))))
+                      (setq pos (next-single-property-change pos 'begin))))
+                  (expect checked :to-be-greater-than 100)
+                  (expect mismatches :to-equal 0))
+
+                ;; 4. Verify second half has morphs (tests chunking beyond 8KB)
+                (let ((midpoint (/ buf-size 2))
+                      (found-after-mid nil))
+                  (let ((pos midpoint))
+                    (while (and (< pos buf-size) (not found-after-mid))
+                      (when (get-text-property pos 'yk-morph)
+                        (setq found-after-mid pos))
+                      (setq pos (1+ pos))))
+                  (expect found-after-mid :to-be-truthy)))))
+
+        ;; Cleanup
+        (yk-db-status-close)
+        (when (file-exists-p temp-db) (delete-file temp-db))
+        (setq yk-db-status-file saved-status-file)
+        (setq yk-db-status saved-db-status)
+        (clrhash yk-status-table)))))
+
 ;;; test-yomikun-mecab.el ends here

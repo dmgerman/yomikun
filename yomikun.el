@@ -912,48 +912,20 @@ Updates the database, memoization cache, and all overlays in the buffer."
 
 (defun yk-process-region (beg end &optional callback)
   "Process the region BEG to END through mecab and apply token overlays.
-Uses `yomikun-mecab' for parsing with byte-offset based position mapping.
-Processing is asynchronous — Emacs remains responsive during mecab execution.
-When CALLBACK is non-nil, it is called with no arguments in the source
-buffer after tokens have been applied."
+Text is split into chunks to handle mecab's 8KB byte-offset limit.
+When CALLBACK is non-nil, it is called with no arguments after completion."
   (yk-mecab--validate-binary)
   (yk-mecab--validate-dict-dir)
   (if (= beg end)
       (progn
         (message "Yomikun: empty region, nothing to process.")
         (when callback (funcall callback)))
-    (let* ((input-text (buffer-substring-no-properties beg end))
-         (temp-file (yk-mecab--write-temp-file input-text))
-         (source-buffer (current-buffer))
-         (args (yk-mecab--build-args temp-file))
-         (proc-buffer (generate-new-buffer " *yomikun-mecab*")))
-    (buffer-disable-undo proc-buffer)
-    (let ((process (make-process
-                    :name "yomikun-mecab"
-                    :buffer proc-buffer
-                    :command (cons yk-mecab-binary args)
-                    :sentinel
-                    (lambda (proc event)
-                      (unwind-protect
-                          (cond
-                           ((string-match-p "finished" event)
-                            (let ((output (with-current-buffer (process-buffer proc)
-                                            (buffer-substring-no-properties
-                                             (point-min) (point-max)))))
-                              (with-current-buffer source-buffer
-                                (let ((tokens (yk-mecab--parse-output
-                                               output input-text beg)))
-                                  (yk-debug-message "Parsed %d tokens" (length tokens))
-                                  (yk-process-tokens tokens))
-                                (when callback
-                                  (funcall callback)))))
-                           (t
-                            (message "Yomikun: mecab process failed: %s" (string-trim event))))
-                        (when (buffer-live-p proc-buffer)
-                          (kill-buffer proc-buffer))
-                        (when (file-exists-p temp-file)
-                          (delete-file temp-file))))))))
-      (yk-debug-message "Mecab process started"))))
+    (let ((input-text (buffer-substring-no-properties beg end)))
+      (let ((tokens (yk-mecab--parse-output-chunked input-text beg)))
+        (yk-debug-message "Parsed %d tokens" (length tokens))
+        (yk-process-tokens tokens)
+        (when callback
+          (funcall callback))))))
 
 (defun yk-visit-site-with-param (base-url parm)
   (let ((url (format base-url (url-hexify-string parm))))
