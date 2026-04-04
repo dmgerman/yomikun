@@ -52,7 +52,6 @@ Safety limit to prevent runaway processing on huge buffers."
   :group 'yomikun)
 
 
-(defvar yk-report-buffer "*yk-report*" "Name of buffer for report")
 
 (defun yk-katakana-to-hiragana (str)
   "Convert katakana to hiragana. Very rough, but it works"
@@ -501,28 +500,22 @@ Safety limit to prevent runaway processing on huge buffers."
   )
 
 (defun yk-mark-as-compound (lst)
-  ;; this function is probably slower than it can be
-  ;; but it not executed a lot
+  "Mark LST as a compound term with overlay and text properties."
   (setq yk-compound-occurences (+ 1 yk-compound-occurences))
-
-  (let*(
-       (beg-compound (car (nth 0 lst)))
-       (end-token-pos   (car (nth 1 lst)) )
-       (end-compound    (+ (get-text-property end-token-pos 'end) -1))
-       (st  (nth 2 lst))
-       )
-    (yk-debug-message "beg [%s] end [%s] st [%s] len [%d]" beg-compound end-compound st (length st))
+  (let* ((beg-compound (car (nth 0 lst)))
+         (end-token-pos (car (nth 1 lst)))
+         (end-compound (+ (get-text-property end-token-pos 'end) -1))
+         (st (nth 2 lst)))
+    (yk-debug-message "beg [%s] end [%s] st [%s] len [%d]"
+                      beg-compound end-compound st (length st))
     (yk-set-overlay-compound-at-pos beg-compound end-compound)
-    (dolist (pos (number-sequence beg-compound end-compound))
-      (let (
-            (cur-prop (get-text-property pos 'compound))
-            )
-        (yk-debug-message "setting [%d] with [%s] current [%s]" pos st cur-prop)
-        (put-text-property pos (+ 1 pos) 'compound (cons st cur-prop ))
-        )
-      )
-    )
-  )
+    ;; Each character may belong to multiple overlapping compounds,
+    ;; so we must cons onto the existing property per-character.
+    (let ((pos beg-compound))
+      (while (<= pos end-compound)
+        (put-text-property pos (1+ pos) 'compound
+                           (cons st (get-text-property pos 'compound)))
+        (setq pos (1+ pos))))))
 
 (defun yk-process-compounds-in-phrase (beg end)
 ;  (message "sentence [%s]" (buffer-substring beg end))
@@ -607,9 +600,6 @@ and call pfun on it"
     (remove-overlays beg end 'yomikun-comp t)
   )))
 
-(defvar yk-test-all-morphs (make-hash-table :test 'equal)
-  "Hash table for morph frequency analysis.")
-
 (defun yk-morph-get-morph-from-props (props)
   "get the morph from the properties"
   (list
@@ -666,20 +656,13 @@ The list is sorted using COMPARE-FUNC to compare elements."
   )
 
 (defun yk-report-all-morphs ()
-  "report the frequency of morphs"
+  "Report the frequency of morphs in the current buffer."
   (interactive)
-  (let (
-        (morphs (yk-extract-all-morphs))
-;        (buffer (create... yk-report-buffer))
-        )
-    
-    (mapc 
+  (let ((morphs (yk-extract-all-morphs)))
+    (mapc
      (lambda (m) (message "morphs [%s]" m))
-     morphs
-     )
-    (message "total: %d" (length morphs))
-    )
-  )
+     morphs)
+    (message "total: %d" (length morphs))))
 
 (defun yk-update-status-at-position (beg end wtype newstatus)
   ;;
@@ -1063,16 +1046,15 @@ Processing is asynchronous — Emacs remains responsive during mecab execution."
 
 ;;;###autoload
 (define-minor-mode yk-minor-mode
-  "my help"
-
+  "Minor mode for interacting with yomikun-processed Japanese text.
+Provides keybindings for marking word status, looking up definitions,
+and navigating Japanese text."
   :global nil
-  :lighter   "_yk_"    ; lighter
-  :keymap yk-minor-map             ; keymap
-  :after-hook (progn
-                (cursor-sensor-mode -1)
-                )
-  ;; this is where the code goes
-  )
-
+  :lighter " yk"
+  :keymap yk-minor-map
+  :after-hook (if yk-minor-mode
+                  (cursor-sensor-mode 1)
+                (cursor-sensor-mode -1)))
 
 (provide 'yomikun)
+;;; yomikun.el ends here
