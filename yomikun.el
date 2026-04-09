@@ -25,6 +25,7 @@
 (require 'cl-lib)
 (require 'yomikun-db)
 (require 'yomikun-mecab)
+(require 'yomikun-dict)
 
 ;;; --- Customization Group ---
 
