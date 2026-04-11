@@ -42,6 +42,11 @@
 
 ;;; --- Tooltip Display ---
 
+(defvar yk--tooltip-showing nil
+  "Non-nil while a pos-tip tooltip is being shown.
+Used to prevent re-entrant tooltip calls triggered by pos-tip's internal
+sit-for during frame offset calibration.")
+
 (defun yk-pad-first-line (str)
   "Prepare STR for display in a pos-tip tooltip.
 Pads the first line to the width of the longest content line.
@@ -61,11 +66,13 @@ Appends two trailing blank lines to compensate for pos-tip cropping."
 
 (defun yk-tip-show (msg)
   "Display MSG in a tooltip near point."
-  (condition-case nil
-      (pos-tip-show (yk-pad-first-line msg)
-                    nil nil nil
-                    yk-tooltip-timeout)
-    (error (message "Yomikun: %s" (or msg "")))))
+  (unless yk--tooltip-showing
+    (let ((yk--tooltip-showing t))
+      (condition-case nil
+          (pos-tip-show (yk-pad-first-line msg)
+                        nil nil nil
+                        yk-tooltip-timeout)
+        (error (message "Yomikun: %s" (or msg "")))))))
 
 ;;; --- External Command Runner ---
 
