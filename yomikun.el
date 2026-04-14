@@ -839,7 +839,7 @@ Updates the database, memoization cache, and all overlays in the buffer."
                                 (plist-get props 'pronun)
                                 (plist-get props 'wtype))))
           (when def
-            (yk-tip-show (format "%s (%s)" (nth 0 def) (nth 1 def)))))))))
+            (yk-tip-show (format "%s\n%s (%s)" (nth 3 def) (nth 0 def) (nth 1 def)))))))))
 
 (defun yk-quick-dict-at-point ()
   (interactive)
