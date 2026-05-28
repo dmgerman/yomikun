@@ -302,7 +302,7 @@ When CALLBACK is non-nil, it is called after processing completes."
     (while pos
       (when (and (get-text-property pos 'yk-morph)
                  (funcall cmpfun pos))
-        (funcall pfun pos (next-single-property-change pos 'yk-morph)))
+        (funcall pfun pos (or (next-single-property-change pos 'yk-morph) (point-max))))
       (setq pos (next-single-property-change pos 'yk-morph))
       )))
 
@@ -510,7 +510,7 @@ When CALLBACK is non-nil, it is called after processing completes."
          (st (nth 2 lst)))
     (yk-debug-message "beg [%s] end [%s] st [%s] len [%d]"
                       beg-compound end-compound st (length st))
-    (yk-set-overlay-compound-at-pos beg-compound end-compound)
+    (yk-set-overlay-compound-at-pos beg-compound (1+ end-compound))
     ;; Each character may belong to multiple overlapping compounds,
     ;; so we must cons onto the existing property per-character.
     (let ((pos beg-compound))
