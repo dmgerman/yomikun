@@ -91,7 +91,8 @@
       "Bash(xcodebuild -project Yomikun.xcodeproj -scheme Yomikun -destination 'platform=iOS,id=00EE23B3-1206-5AFA-BF28-AD30059CECA0' -configuration Debug build)",
       "Bash(xcodebuild -project Yomikun.xcodeproj -scheme Yomikun -showdestinations)",
       "Bash(xcodebuild -project Yomikun.xcodeproj -scheme Yomikun -destination 'platform=iOS,id=00008103-001070683C33001E' -configuration Debug build)",
-      "Bash(xcodebuild -project Yomikun.xcodeproj -scheme Yomikun -destination 'generic/platform=iOS' -configuration Debug build)"
+      "Bash(xcodebuild -project Yomikun.xcodeproj -scheme Yomikun -destination 'generic/platform=iOS' -configuration Debug build)",
+      "Bash(bash *)"
     ]
   }
 }
